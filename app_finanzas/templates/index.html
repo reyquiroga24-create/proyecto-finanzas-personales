@@ -222,11 +222,11 @@
                         </span>
                     </div>
                     <div class="card-row">
-                        <span class="card-label">Actualizar</span>
+                        <span class="card-label">Agregar</span>
                         <span class="card-value">
                             <form action="{{ url_for('actualizar_ahorro', id=item.id) }}" method="POST" style="display:flex;gap:4px;padding:0;border:none;box-shadow:none;background:none;margin:0;align-items:center;">
-                                <input type="number" name="monto_actual" step="0.01" placeholder="$" value="{{ item.monto_actual }}" style="width:80px;padding:4px 6px;border:1px solid var(--input-border);border-radius:4px;font-size:0.78em;background:var(--input-bg);color:var(--text);">
-                                <button type="submit" class="btn btn-sm" style="padding:4px 8px;font-size:0.72em;">Actualizar</button>
+                                <input type="number" name="monto_agregar" step="0.01" placeholder="$ cuanto agregaste?" style="width:110px;padding:4px 6px;border:1px solid var(--input-border);border-radius:4px;font-size:0.78em;background:var(--input-bg);color:var(--text);">
+                                <button type="submit" class="btn btn-sm btn-success" style="padding:4px 8px;font-size:0.72em;">+ Agregar</button>
                             </form>
                         </span>
                     </div>
@@ -427,43 +427,105 @@
 
             <!-- Modal crear plan -->
             <div id="planModal" class="modal">
-                <div class="modal-content">
+                <div class="modal-content" style="max-width:450px;">
                     <div class="modal-header">
-                        <h3>Nuevo Plan de Pago</h3>
+                        <h3>Nuevo Arreglo de Pago</h3>
                         <button class="btn btn-sm btn-secondary" onclick="document.getElementById('planModal').classList.remove('show')">✕</button>
                     </div>
-                    <form action="{{ url_for('crear_plan_pago', perfil='hogar') }}" method="POST">
+                    <form id="planForm" action="{{ url_for('crear_plan_pago', perfil='hogar') }}" method="POST" style="font-size:0.9em;">
                         <label>¿Qué servicio/deuda es?</label>
                         <input type="text" name="nombre" placeholder="Ej: Luz" required>
-                        <label>Monto total</label>
-                        <input type="number" name="monto_total" step="0.01" required>
-                        <button type="submit">Crear Plan</button>
+
+                        <label>Monto total acordado</label>
+                        <input type="number" name="monto_total" id="montoTotal" step="0.01" placeholder="0.00" required oninput="calcRestante()">
+
+                        <hr style="margin:12px 0;border-color:var(--border);">
+
+                        <label style="font-weight:600;">Abonos (pagos parciales)</label>
+                        <div id="abonosContainer">
+                            <div class="abono-row" style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">
+                                <input type="number" name="abono_monto" placeholder="$ monto" step="0.01" style="flex:1;padding:6px 8px;border:1px solid var(--input-border);border-radius:4px;font-size:0.82em;background:var(--input-bg);color:var(--text);" oninput="calcRestante()">
+                                <input type="date" name="abono_fecha" style="flex:1;padding:6px 8px;border:1px solid var(--input-border);border-radius:4px;font-size:0.82em;background:var(--input-bg);color:var(--text);">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="this.parentElement.remove();calcRestante();" style="padding:3px 8px;">✕</button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm" onclick="addAbonoRow()" style="margin-bottom:8px;">+ Agregar otro abono</button>
+
+                        <div style="background:var(--bg-secondary);padding:8px 12px;border-radius:6px;margin-bottom:10px;">
+                            <strong>Total abonos: $<span id="totalAbonos">0.00</span></strong>
+                            <span id="restanteMsg" style="margin-left:10px;font-size:0.85em;"></span>
+                        </div>
+
+                        <button type="submit" class="btn" style="width:100%;">Crear Plan de Pago</button>
                     </form>
-                    <p style="font-size:0.75em;color:var(--text-secondary);margin-top:8px;">Después de crear el plan, agrega los abonos (pagos parciales) abajo.</p>
                 </div>
             </div>
+
+            <script>
+            function addAbonoRow() {
+                const c = document.getElementById('abonosContainer');
+                const row = document.createElement('div');
+                row.className = 'abono-row';
+                row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+                const hoy = new Date().toISOString().split('T')[0];
+                row.innerHTML = `
+                    <input type="number" name="abono_monto" placeholder="$ monto" step="0.01" style="flex:1;padding:6px 8px;border:1px solid var(--input-border);border-radius:4px;font-size:0.82em;background:var(--input-bg);color:var(--text);" oninput="calcRestante()">
+                    <input type="date" name="abono_fecha" value="${hoy}" style="flex:1;padding:6px 8px;border:1px solid var(--input-border);border-radius:4px;font-size:0.82em;background:var(--input-bg);color:var(--text);">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="this.parentElement.remove();calcRestante();" style="padding:3px 8px;">✕</button>
+                `;
+                c.appendChild(row);
+            }
+            function calcRestante() {
+                const total = parseFloat(document.getElementById('montoTotal').value) || 0;
+                const abonos = document.querySelectorAll('input[name="abono_monto"]');
+                let suma = 0;
+                abonos.forEach(i => suma += parseFloat(i.value) || 0);
+                document.getElementById('totalAbonos').textContent = suma.toFixed(2);
+                const msg = document.getElementById('restanteMsg');
+                if (total > 0 && suma !== total) {
+                    const diff = total - suma;
+                    msg.innerHTML = diff > 0
+                        ? `<span style="color:var(--orange);">Faltan $${diff.toFixed(2)} en abonos</span>`
+                        : `<span style="color:var(--red);">Sobra $${Math.abs(diff).toFixed(2)}</span>`;
+                } else {
+                    msg.innerHTML = suma > 0
+                        ? `<span style="color:var(--green);">✓ Montos cuadran</span>`
+                        : '';
+                }
+            }
+            </script>
 
             {% if planes %}
             {% for plan in planes %}
             {% set restante = plan.total_abonos - plan.total_pagado %}
+            {% set pagado_plan = plan.total_pagado %}
+            {% set pendiente = plan.monto_total - pagado_plan %}
+            {% set prog_plan = (pagado_plan / plan.monto_total * 100)|round if plan.monto_total > 0 else 0 %}
             <div class="card-item" style="margin-bottom:8px;">
                 <div class="card-row">
                     <span class="card-label">Servicio</span>
                     <span class="card-value" style="font-weight:700;">{{ plan.nombre }}</span>
                 </div>
                 <div class="card-row">
-                    <span class="card-label">Total</span>
+                    <span class="card-label">Total acordado</span>
                     <span class="card-value card-value-negative">${{ "%.2f"|format(plan.monto_total) }}</span>
                 </div>
                 <div class="card-row">
                     <span class="card-label">Pagado</span>
-                    <span class="card-value">${{ "%.2f"|format(plan.total_pagado) }}</span>
+                    <span class="card-value">${{ "%.2f"|format(pagado_plan) }}</span>
                 </div>
                 <div class="card-row">
-                    <span class="card-label">Pendiente</span>
-                    <span class="card-value card-value-negative">${{ "%.2f"|format(plan.monto_total - plan.total_pagado) }}</span>
+                    <span class="card-label">Falta</span>
+                    <span class="card-value card-value-negative" style="font-size:1em;font-weight:700;">${{ "%.2f"|format(pendiente) }}</span>
                 </div>
-
+                <div class="card-row">
+                    <span class="card-label">Progreso</span>
+                    <span class="card-value">
+                        <div class="progress-bar"><div class="progress-fill" style="width:{{ prog_plan }}%;background:var(--orange);"></div></div>
+                        <small>{{ prog_plan|int }}%</small>
+                    </span>
+                </div>
+                {% if pendiente > 0 %}
                 <!-- Agregar abono -->
                 <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
                     <form action="{{ url_for('agregar_abono', perfil='hogar') }}" method="POST" style="display:flex;gap:4px;padding:0;border:none;box-shadow:none;background:none;margin:0;align-items:center;flex-wrap:wrap;">
@@ -495,6 +557,7 @@
                 {% endfor %}
                 {% endfor %}
 
+                {% endif %}
                 <div class="card-actions" style="margin-top:6px;">
                     <form action="{{ url_for('eliminar_plan', perfil='hogar', id=plan.id) }}" method="POST" style="display:inline;margin:0;">
                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar plan {{ plan.nombre }} y todos sus abonos?')">Eliminar Plan</button>

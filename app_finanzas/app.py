@@ -567,12 +567,16 @@ def agregar_ahorro():
 
 @app.route('/actualizar_ahorro/<int:id>', methods=('POST',))
 def actualizar_ahorro(id):
-    monto = request.form.get('monto_actual')
-    if monto:
-        conn = get_db()
-        conn.execute('UPDATE ahorros_personales SET monto_actual = ? WHERE id = ?', (float(monto), id))
+    conn = get_db()
+    ahorro = conn.execute('SELECT * FROM ahorros_personales WHERE id=?', (id,)).fetchone()
+    monto = request.form.get('monto_agregar')
+    if monto and ahorro:
+        nuevo_total = ahorro['monto_actual'] + float(monto)
+        conn.execute('UPDATE ahorros_personales SET monto_actual = ? WHERE id = ?', (nuevo_total, id))
         conn.commit(); conn.close()
-        flash('Ahorro actualizado!', 'success')
+        flash(f'${monto} agregado a ahorro! Total: ${nuevo_total:.2f}', 'success')
+    else:
+        conn.close()
     return redirect(url_for('index', perfil='personal'))
 
 @app.route('/editar_ahorro/<int:id>', methods=('GET', 'POST'))
@@ -604,9 +608,20 @@ def crear_plan_pago(perfil):
     monto_total = request.form.get('monto_total')
     if nombre and monto_total:
         conn = get_db()
-        conn.execute('INSERT INTO planes_pago (perfil, nombre, monto_total) VALUES (?,?,?)', (perfil, nombre, float(monto_total)))
+        cursor = conn.execute('INSERT INTO planes_pago (perfil, nombre, monto_total) VALUES (?,?,?)',
+                              (perfil, nombre, float(monto_total)))
+        plan_id = cursor.lastrowid
+        # Procesar abonos del formulario
+        abonos_monto = request.form.getlist('abono_monto')
+        abonos_fecha = request.form.getlist('abono_fecha')
+        for monto, fecha in zip(abonos_monto, abonos_fecha):
+            monto = monto.strip()
+            fecha = fecha.strip()
+            if monto and fecha and float(monto) > 0:
+                conn.execute('INSERT INTO abonos_pago (plan_id, monto, fecha) VALUES (?,?,?)',
+                             (plan_id, float(monto), fecha))
         conn.commit(); conn.close()
-        flash('Plan de pago creado!', 'success')
+        flash(f'Plan de pago "{nombre}" creado con abonos!', 'success')
     return redirect(url_for('index', perfil=perfil))
 
 @app.route('/agregar_abono/<perfil>', methods=('POST',))
