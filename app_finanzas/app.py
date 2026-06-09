@@ -829,12 +829,11 @@ def api_recordatorios(perfil):
 @app.route('/apartar_sobrante/<semana>', methods=('POST',))
 def apartar_sobrante(semana):
     accion = request.form.get('accion', 'si')
+    monto_manual = request.form.get('monto_apartar', '').strip()
     conn = get_db()
     if accion == 'si':
-        # Primero veo si ya existe registro para esta semana
         existente = conn.execute("SELECT * FROM fondo_semanal WHERE semana=?", (semana,)).fetchone()
         if not existente:
-            # Obtener el sobrante calculado
             hoy = date.today()
             semana_actual = hoy.isocalendar()[1]
             anio_actual = hoy.year
@@ -842,7 +841,6 @@ def apartar_sobrante(semana):
             if semana == semana_key:
                 lun = hoy - timedelta(days=hoy.weekday())
                 dom = lun + timedelta(days=6)
-                # Pagos de la semana
                 pagos_prog = conn.execute(
                     'SELECT * FROM pagos_programados WHERE perfil="hogar" AND activo=1'
                 ).fetchall()
@@ -855,29 +853,81 @@ def apartar_sobrante(semana):
                     "SELECT COALESCE(SUM(a.monto),0) FROM abonos_pago a JOIN planes_pago p ON a.plan_id=p.id WHERE a.fecha>=? AND a.fecha<=? AND a.pagado=0 AND p.perfil='hogar'",
                     (lun.isoformat(), dom.isoformat())).fetchone()[0]
                 total_pendiente = total_p + abonos_sem
-                presupuesto = conn.execute(
+                presupuesto_val = conn.execute(
                     "SELECT COALESCE(SUM(monto),0) FROM presupuestos WHERE perfil='hogar' AND semana=?",
                     (semana_key,)).fetchone()[0]
-                sobrante = presupuesto - total_pendiente if presupuesto > 0 else 0
-                # Acumulado anterior
+                sobrante_calc = presupuesto_val - total_pendiente if presupuesto_val > 0 else 0
+
+                # Usar monto manual si el usuario puso uno, si no usar el calculado
+                if monto_manual:
+                    try:
+                        monto_final = float(monto_manual)
+                    except:
+                        monto_final = sobrante_calc if sobrante_calc > 0 else 0
+                else:
+                    monto_final = sobrante_calc if sobrante_calc > 0 else 0
+
                 acum_antes = conn.execute(
                     "SELECT COALESCE(SUM(sobrante),0) FROM fondo_semanal WHERE apartado=1"
                 ).fetchone()[0]
                 conn.execute(
                     "INSERT INTO fondo_semanal (semana, ingreso, sobrante, acumulado_antes, apartado) VALUES (?,?,?,?,1)",
-                    (semana, presupuesto, sobrante if sobrante > 0 else 0, acum_antes))
-                flash(f'${sobrante:.2f} apartados al fondo! Total acumulado: ${acum_antes + (sobrante if sobrante > 0 else 0):.2f}', 'success')
+                    (semana, presupuesto_val, monto_final, acum_antes))
+                flash(f'${monto_final:.2f} apartados al fondo! Total: ${acum_antes + monto_final:.2f}', 'success')
         else:
             conn.execute("UPDATE fondo_semanal SET apartado=1 WHERE semana=?", (semana,))
-            flash('Sobrante apartado al fondo!', 'success')
+            flash('Sobrante apartado!', 'success')
     else:
-        # No apartar, registrar la semana sin apartar
         conn.execute(
             "INSERT OR IGNORE INTO fondo_semanal (semana, ingreso, sobrante, apartado) VALUES (?,?,?,0)",
             (semana, 0, 0, 0))
-        flash('Ok, no se apartó nada.', 'info')
+        flash('Ok, no se apartó.', 'info')
     conn.commit(); conn.close()
     return redirect(url_for('index', perfil='hogar'))
+
+@app.route('/retirar_fondo', methods=('POST',))
+def retirar_fondo():
+    monto = request.form.get('monto_retirar', '').strip()
+    if monto:
+        try:
+            monto_ret = float(monto)
+        except:
+            flash('Monto invalido', 'error')
+            return redirect(url_for('index', perfil='hogar'))
+        conn = get_db()
+        # Buscar la ultima semana con apartado
+        ultimo = conn.execute(
+            "SELECT * FROM fondo_semanal WHERE apartado=1 ORDER BY semana DESC LIMIT 1"
+        ).fetchone()
+        if ultimo:
+            # Ajustar el sobrante de la ultima entrada
+            nuevo_sobrante = ultimo['sobrante'] - monto_ret
+            conn.execute(
+                "UPDATE fondo_semanal SET sobrante=? WHERE id=?",
+                (max(0, nuevo_sobrante), ultimo['id']))
+            flash(f'${monto_ret:.2f} retirados del fondo!', 'info')
+        else:
+            flash('No hay fondo para retirar', 'error')
+        conn.commit(); conn.close()
+    return redirect(url_for('index', perfil='hogar'))
+
+@app.route('/retirar_ahorro_personal/<int:id>', methods=('POST',))
+def retirar_ahorro_personal(id):
+    monto = request.form.get('monto_retirar', '').strip()
+    if monto:
+        try:
+            monto_ret = float(monto)
+        except:
+            flash('Monto invalido', 'error')
+            return redirect(url_for('index', perfil='personal'))
+        conn = get_db()
+        ahorro = conn.execute('SELECT * FROM ahorros_personales WHERE id=?', (id,)).fetchone()
+        if ahorro:
+            nuevo_actual = max(0, ahorro['monto_actual'] - monto_ret)
+            conn.execute('UPDATE ahorros_personales SET monto_actual=? WHERE id=?', (nuevo_actual, id))
+            flash(f'${monto_ret:.2f} retirados de "{ahorro["nombre"]}". Quedan ${nuevo_actual:.2f}', 'info')
+        conn.commit(); conn.close()
+    return redirect(url_for('index', perfil='personal'))
 
 @app.route('/reiniciar_fondo', methods=('POST',))
 def reiniciar_fondo():
@@ -886,6 +936,117 @@ def reiniciar_fondo():
     conn.commit(); conn.close()
     flash('Fondo reiniciado!', 'success')
     return redirect(url_for('index', perfil='hogar'))
+
+# ---- Reportes ----
+@app.route('/reporte')
+def reporte():
+    conn = get_db()
+    hoy = date.today()
+    anio_actual = hoy.year
+    mes_actual = hoy.month
+
+    # Parametros
+    try:
+        anio_r = int(request.args.get('anio', anio_actual))
+        mes_r = int(request.args.get('mes', 0))
+    except:
+        anio_r = anio_actual
+        mes_r = 0
+
+    if mes_r == 0:
+        # Reporte anual
+        titulo = f"Reporte {anio_r}"
+        # Gastos por mes y perfil
+        reporte_data = []
+        total_anual_personal = 0
+        total_anual_hogar = 0
+        for m in range(1, 13):
+            ms = f"{anio_r}-{m:02d}"
+            total_p = conn.execute(
+                "SELECT COALESCE(SUM(monto),0) FROM gastos WHERE perfil='personal' AND strftime('%Y-%m',fecha)=?",
+                (ms,)).fetchone()[0]
+            total_h = conn.execute(
+                "SELECT COALESCE(SUM(monto),0) FROM gastos WHERE perfil='hogar' AND strftime('%Y-%m',fecha)=?",
+                (ms,)).fetchone()[0]
+            total_anual_personal += total_p
+            total_anual_hogar += total_h
+            reporte_data.append({
+                'mes': MESES_ES[m],
+                'mes_num': m,
+                'personal': total_p,
+                'hogar': total_h,
+                'total': total_p + total_h
+            })
+        # Categorias del año
+        cats_personal = conn.execute(
+            "SELECT categoria, SUM(monto) as total FROM gastos WHERE perfil='personal' AND strftime('%Y',fecha)=? GROUP BY categoria ORDER BY total DESC",
+            (str(anio_r),)).fetchall()
+        cats_hogar = conn.execute(
+            "SELECT categoria, SUM(monto) as total FROM gastos WHERE perfil='hogar' AND strftime('%Y',fecha)=? GROUP BY categoria ORDER BY total DESC",
+            (str(anio_r),)).fetchall()
+        # Ingresos del año
+        ingresos_anio = conn.execute(
+            "SELECT COALESCE(SUM(monto),0) FROM ingresos WHERE strftime('%Y',fecha)=?",
+            (str(anio_r),)).fetchone()[0]
+
+        conn.close()
+        return render_template('reporte.html',
+            titulo=titulo, tipo='anual',
+            reporte_data=reporte_data,
+            total_anual=total_anual_personal + total_anual_hogar,
+            total_personal=total_anual_personal,
+            total_hogar=total_anual_hogar,
+            cats_personal=cats_personal,
+            cats_hogar=cats_hogar,
+            ingresos_anio=ingresos_anio,
+            anio=anio_r, mes=0,
+            MESES_ES=MESES_ES,
+            anio_actual=anio_actual,
+            perfiles=PERFILES, perfil_activo='reporte')
+    else:
+        # Reporte mensual
+        titulo = f"{MESES_ES[mes_r]} {anio_r}"
+        ms = f"{anio_r}-{mes_r:02d}"
+
+        gastos_personal = conn.execute(
+            "SELECT * FROM gastos WHERE perfil='personal' AND strftime('%Y-%m',fecha)=? ORDER BY fecha DESC",
+            (ms,)).fetchall()
+        gastos_hogar = conn.execute(
+            "SELECT * FROM gastos WHERE perfil='hogar' AND strftime('%Y-%m',fecha)=? ORDER BY fecha DESC",
+            (ms,)).fetchall()
+        total_p = conn.execute(
+            "SELECT COALESCE(SUM(monto),0) FROM gastos WHERE perfil='personal' AND strftime('%Y-%m',fecha)=?",
+            (ms,)).fetchone()[0]
+        total_h = conn.execute(
+            "SELECT COALESCE(SUM(monto),0) FROM gastos WHERE perfil='hogar' AND strftime('%Y-%m',fecha)=?",
+            (ms,)).fetchone()[0]
+        cats_personal = conn.execute(
+            "SELECT categoria, SUM(monto) as total FROM gastos WHERE perfil='personal' AND strftime('%Y-%m',fecha)=? GROUP BY categoria ORDER BY total DESC",
+            (ms,)).fetchall()
+        cats_hogar = conn.execute(
+            "SELECT categoria, SUM(monto) as total FROM gastos WHERE perfil='hogar' AND strftime('%Y-%m',fecha)=? GROUP BY categoria ORDER BY total DESC",
+            (ms,)).fetchall()
+        ingresos_mes = conn.execute(
+            "SELECT COALESCE(SUM(monto),0) FROM ingresos WHERE strftime('%Y-%m',fecha)=?",
+            (ms,)).fetchone()[0]
+
+        conn.close()
+        return render_template('reporte.html',
+            titulo=titulo, tipo='mensual',
+            gastos_personal=gastos_personal,
+            gastos_hogar=gastos_hogar,
+            total_personal=total_p,
+            total_hogar=total_h,
+            total_mes=total_p + total_h,
+            cats_personal=cats_personal,
+            cats_hogar=cats_hogar,
+            ingresos_mes=ingresos_mes,
+            anio=anio_r, mes=mes_r,
+            MESES_ES=MESES_ES,
+            fecha_legible=fecha_legible,
+            anio_actual=anio_actual,
+            CATEGORIAS=CATEGORIAS,
+            perfiles=PERFILES, perfil_activo='reporte')
 
 if __name__ == '__main__':
     init_db()

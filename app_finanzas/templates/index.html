@@ -214,6 +214,12 @@
                     </span>
                 </div>
                 <div class="card-actions">
+                    {% if item.monto_actual > 0 %}
+                    <form action="{{ url_for('retirar_ahorro_personal', id=item.id) }}" method="POST" style="display:inline;margin:0;padding:0;border:none;box-shadow:none;background:none;">
+                        <input type="number" name="monto_retirar" step="0.01" placeholder="$ retirar" style="width:70px;padding:3px 5px;border:1px solid var(--input-border);border-radius:4px;font-size:0.7em;background:var(--input-bg);color:var(--text);">
+                        <button type="submit" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:0.65em;">Retirar</button>
+                    </form>
+                    {% endif %}
                     <a href="{{ url_for('editar_ahorro', id=item.id) }}" class="btn btn-sm btn-outline">Editar</a>
                     <form action="{{ url_for('eliminar_ahorro', id=item.id) }}" method="POST" style="display:inline;margin:0;padding:0;border:none;box-shadow:none;background:none;">
                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar {{ item.nombre }}?')">Eliminar</button>
@@ -370,16 +376,16 @@
         <div style="text-align:center;padding:6px;font-size:0.8em;color:var(--text-secondary);margin-bottom:8px;">
             💡 Sobraron <strong>${{ "%.2f"|format(fondo_info.sobrante) }}</strong> esta semana
         </div>
-        <div style="display:flex;gap:6px;">
-            <form action="{{ url_for('apartar_sobrante', semana=fondo_info.semana_key) }}" method="POST" style="flex:1;margin:0;padding:0;border:none;box-shadow:none;background:none;">
-                <input type="hidden" name="accion" value="si">
-                <button type="submit" class="btn btn-sm btn-success" style="width:100%;padding:8px;">✅ Sí, apartar ${{ "%.0f"|format(fondo_info.sobrante) }}</button>
-            </form>
-            <form action="{{ url_for('apartar_sobrante', semana=fondo_info.semana_key) }}" method="POST" style="flex:1;margin:0;padding:0;border:none;box-shadow:none;background:none;">
-                <input type="hidden" name="accion" value="no">
-                <button type="submit" class="btn btn-sm btn-outline" style="width:100%;padding:8px;">No</button>
-            </form>
-        </div>
+        <form action="{{ url_for('apartar_sobrante', semana=fondo_info.semana_key) }}" method="POST" style="margin:0;padding:0;border:none;box-shadow:none;background:none;">
+            <input type="hidden" name="accion" value="si">
+            <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">
+                <input type="number" name="monto_apartar" step="0.01" value="{{ "%.2f"|format(fondo_info.sobrante) }}" style="flex:1;padding:8px;border:1px solid var(--input-border);border-radius:6px;font-size:0.85em;background:var(--input-bg);color:var(--text);text-align:center;">
+            </div>
+            <div style="display:flex;gap:6px;">
+                <button type="submit" class="btn btn-sm btn-success" style="flex:1;padding:8px;">✅ Apartar</button>
+                <a href="#" class="btn btn-sm btn-outline" style="flex:1;padding:8px;text-align:center;" onclick="event.preventDefault();this.closest('form').querySelector('input[name=monto_apartar]').value='0';this.closest('form').querySelector('input[name=accion]').value='no';this.closest('form').submit();">No apartar</a>
+            </div>
+        </form>
         {% endif %}
     </div>
 
@@ -388,9 +394,12 @@
         <div class="section-header">
             <h2 class="gradient-text-orange">🐷 Fondo Acumulado</h2>
             {% if fondo_info.total_acumulado > 0 %}
-            <form action="{{ url_for('reiniciar_fondo') }}" method="POST" style="display:inline;margin:0;padding:0;border:none;box-shadow:none;background:none;">
-                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Reiniciar fondo a $0?')">Reiniciar</button>
-            </form>
+            <div style="display:flex;gap:4px;">
+                <button class="btn btn-sm btn-outline" onclick="document.getElementById('retirarFondoModal').classList.add('show')" style="padding:3px 8px;font-size:0.7em;">Retirar</button>
+                <form action="{{ url_for('reiniciar_fondo') }}" method="POST" style="display:inline;margin:0;padding:0;border:none;box-shadow:none;background:none;">
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Reiniciar fondo a $0?')" style="padding:3px 8px;font-size:0.7em;">Reiniciar</button>
+                </form>
+            </div>
             {% endif %}
         </div>
         <div class="card-item">
@@ -421,6 +430,21 @@
         {% endif %}
     </div>
     {% endif %}
+
+    <!-- MODAL: RETIRAR DEL FONDO -->
+    <div class="modal" id="retirarFondoModal">
+        <div class="modal-content" style="max-width:350px;">
+            <div class="modal-header">
+                <h3>💰 Retirar del Fondo</h3>
+                <button class="btn btn-sm btn-secondary" onclick="document.getElementById('retirarFondoModal').classList.remove('show')">✕</button>
+            </div>
+            <p style="font-size:0.85em;color:var(--text-secondary);">Fondo actual: <strong style="color:var(--orange);">${{ "%.2f"|format(fondo_info.total_acumulado) }}</strong></p>
+            <form action="{{ url_for('retirar_fondo') }}" method="POST">
+                <input type="number" name="monto_retirar" step="0.01" placeholder="$ Cuanto necesitas?" required style="width:100%;padding:10px;border:1px solid var(--input-border);border-radius:8px;font-size:0.9em;background:var(--input-bg);color:var(--text);margin-bottom:10px;">
+                <button type="submit" class="btn btn-danger" style="width:100%;">Retirar</button>
+            </form>
+        </div>
+    </div>
 
     <!-- Calendario Hogar -->
     <div class="section">
@@ -1016,6 +1040,7 @@
 
     <!-- FOOTER -->
     <div class="footer-bar">
+        <a href="{{ url_for('reporte') }}" class="btn btn-sm btn-outline" style="margin-bottom:8px;">📊 Ver Reportes</a><br>
         Mis Finanzas 💰
     </div>
 

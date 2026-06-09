@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reporte - Finanzas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .reporte-tabla { width:100%; border-collapse:collapse; font-size:0.8em; }
+        .reporte-tabla th { text-align:left; padding:6px 8px; border-bottom:2px solid var(--border); font-weight:600; color:var(--text-secondary); font-size:0.75em; text-transform:uppercase; }
+        .reporte-tabla td { padding:6px 8px; border-bottom:1px solid var(--border-light); }
+        .reporte-tabla tr:last-child td { border-bottom:none; }
+        .reporte-total-row td { font-weight:700; border-top:2px solid var(--border); padding-top:8px; }
+        .barrita { height:6px; border-radius:3px; display:inline-block; vertical-align:middle; margin-right:4px; }
+        .nav-anios { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+        .nav-anios a { padding:4px 10px; border-radius:6px; font-size:0.75em; text-decoration:none; background:var(--card-bg); color:var(--text); border:1px solid var(--border); }
+        .nav-anios a.activo { background:var(--blue); color:#fff; border-color:var(--blue); }
+        .nav-meses { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:12px; }
+        .nav-meses a { padding:3px 8px; border-radius:4px; font-size:0.7em; text-decoration:none; background:var(--card-bg); color:var(--text); border:1px solid var(--border); }
+        .nav-meses a.activo { background:var(--blue); color:#fff; border-color:var(--blue); }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="{{ url_for('index', perfil='resumen') }}" class="btn btn-sm btn-outline">← Volver</a>
+        <h1>📊 {{ titulo }}</h1>
+        <div></div>
+    </div>
+    <div class="container" style="padding-top:16px;">
+
+    {% if tipo == 'anual' %}
+    <!-- Navegacion años -->
+    <div class="section" style="padding:10px;">
+        <div class="nav-anios">
+            {% for a in range(anio_actual, anio_actual-5, -1) %}
+            <a href="?anio={{ a }}" class="{% if a == anio %}activo{% endif %}">{{ a }}</a>
+            {% endfor %}
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            {% for m in range(1,13) %}
+            <a href="?anio={{ anio }}&mes={{ m }}" class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:0.65em;">{{ MESES_ES[m][:3] }}</a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Totales anuales -->
+    <div class="dashboard-grid" style="margin-bottom:10px;">
+        <div class="dash-card dash-ingresos">
+            <div class="dash-label">Ingresos {{ anio }}</div>
+            <div class="dash-value">${{ "%.2f"|format(ingresos_anio) }}</div>
+        </div>
+        <div class="dash-card dash-gastos">
+            <div class="dash-label">Total Gastos</div>
+            <div class="dash-value">${{ "%.2f"|format(total_anual) }}</div>
+        </div>
+        <div class="dash-card dash-balance">
+            <div class="dash-label">Mis Gastos</div>
+            <div class="dash-value-sm">${{ "%.2f"|format(total_personal) }}</div>
+        </div>
+        <div class="dash-card dash-totals">
+            <div class="dash-label">Hogar</div>
+            <div class="dash-value-sm">${{ "%.2f"|format(total_hogar) }}</div>
+        </div>
+    </div>
+
+    <!-- Tabla mensual -->
+    <div class="section">
+        <div class="section-header"><h2>📆 Gastos por Mes</h2></div>
+        <table class="reporte-tabla">
+            <tr><th>Mes</th><th>👤 Personal</th><th>🏠 Hogar</th><th style="text-align:right;">Total</th></tr>
+            {% for r in reporte_data %}
+            <tr>
+                <td><a href="?anio={{ anio }}&mes={{ r.mes_num }}" style="color:var(--blue);text-decoration:none;font-weight:600;">{{ r.mes }}</a></td>
+                <td>{% if r.personal > 0 %}${{ "%.0f"|format(r.personal) }}{% else %}—{% endif %}</td>
+                <td>{% if r.hogar > 0 %}${{ "%.0f"|format(r.hogar) }}{% else %}—{% endif %}</td>
+                <td style="text-align:right;font-weight:700;">${{ "%.0f"|format(r.total) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="reporte-total-row">
+                <td><strong>TOTAL</strong></td>
+                <td><strong>${{ "%.0f"|format(total_personal) }}</strong></td>
+                <td><strong>${{ "%.0f"|format(total_hogar) }}</strong></td>
+                <td style="text-align:right;"><strong>${{ "%.0f"|format(total_anual) }}</strong></td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Categorias del año -->
+    <div class="section">
+        <div class="section-header"><h2>📊 Categorías {{ anio }}</h2></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+                <h3 style="font-size:0.8em;margin:0 0 6px;color:var(--blue);">👤 Personal</h3>
+                {% if cats_personal %}
+                {% set max_cat_p = cats_personal[0].total if cats_personal else 1 %}
+                <div class="chart-bars">
+                    {% for c in cats_personal %}
+                    <div class="chart-bar-item">
+                        <div class="chart-bar-label" style="font-size:0.6em;">{{ c.categoria }}</div>
+                        <div class="chart-bar-track"><div class="chart-bar-fill" style="width:{{ (c.total/max_cat_p*100)|round }}%;background:#3b82f6;"></div></div>
+                        <div class="chart-bar-value" style="font-size:0.6em;">${{ "%.0f"|format(c.total) }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}<p class="empty-msg">Sin gastos</p>{% endif %}
+            </div>
+            <div>
+                <h3 style="font-size:0.8em;margin:0 0 6px;color:var(--orange);">🏠 Hogar</h3>
+                {% if cats_hogar %}
+                {% set max_cat_h = cats_hogar[0].total if cats_hogar else 1 %}
+                <div class="chart-bars">
+                    {% for c in cats_hogar %}
+                    <div class="chart-bar-item">
+                        <div class="chart-bar-label" style="font-size:0.6em;">{{ c.categoria }}</div>
+                        <div class="chart-bar-track"><div class="chart-bar-fill" style="width:{{ (c.total/max_cat_h*100)|round }}%;background:#f59e0b;"></div></div>
+                        <div class="chart-bar-value" style="font-size:0.6em;">${{ "%.0f"|format(c.total) }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}<p class="empty-msg">Sin gastos</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% elif tipo == 'mensual' %}
+    <!-- Navegacion meses -->
+    <div class="section" style="padding:10px;">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">
+            {% for m in range(1,13) %}
+            <a href="?anio={{ anio }}&mes={{ m }}" class="btn btn-sm {% if m == mes %}btn-success{% else %}btn-outline{% endif %}" style="padding:2px 6px;font-size:0.6em;">{{ MESES_ES[m][:3] }}</a>
+            {% endfor %}
+        </div>
+        <div style="display:flex;gap:4px;">
+            <a href="?anio={{ anio }}" class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:0.65em;">← Ver año completo</a>
+        </div>
+    </div>
+
+    <!-- Totales del mes -->
+    <div class="dashboard-grid" style="margin-bottom:10px;">
+        <div class="dash-card dash-ingresos">
+            <div class="dash-label">Ingresos</div>
+            <div class="dash-value">${{ "%.2f"|format(ingresos_mes) }}</div>
+        </div>
+        <div class="dash-card dash-gastos">
+            <div class="dash-label">Total Gastos</div>
+            <div class="dash-value">${{ "%.2f"|format(total_mes) }}</div>
+        </div>
+        <div class="dash-card dash-balance">
+            <div class="dash-label">Personal</div>
+            <div class="dash-value-sm">${{ "%.2f"|format(total_personal) }}</div>
+        </div>
+        <div class="dash-card dash-totals">
+            <div class="dash-label">Hogar</div>
+            <div class="dash-value-sm">${{ "%.2f"|format(total_hogar) }}</div>
+        </div>
+    </div>
+
+    <!-- Categorias del mes -->
+    <div class="section">
+        <div class="section-header"><h2>📊 Categorías</h2></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+                <h3 style="font-size:0.8em;margin:0 0 6px;color:var(--blue);">👤 Personal</h3>
+                {% if cats_personal %}
+                {% set max_cat_p = cats_personal[0].total if cats_personal else 1 %}
+                <div class="chart-bars">
+                    {% for c in cats_personal %}
+                    <div class="chart-bar-item">
+                        <div class="chart-bar-label" style="font-size:0.6em;">{{ c.categoria }}</div>
+                        <div class="chart-bar-track"><div class="chart-bar-fill" style="width:{{ (c.total/max_cat_p*100)|round }}%;background:#3b82f6;"></div></div>
+                        <div class="chart-bar-value" style="font-size:0.6em;">${{ "%.0f"|format(c.total) }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}<p class="empty-msg">Sin gastos</p>{% endif %}
+            </div>
+            <div>
+                <h3 style="font-size:0.8em;margin:0 0 6px;color:var(--orange);">🏠 Hogar</h3>
+                {% if cats_hogar %}
+                {% set max_cat_h = cats_hogar[0].total if cats_hogar else 1 %}
+                <div class="chart-bars">
+                    {% for c in cats_hogar %}
+                    <div class="chart-bar-item">
+                        <div class="chart-bar-label" style="font-size:0.6em;">{{ c.categoria }}</div>
+                        <div class="chart-bar-track"><div class="chart-bar-fill" style="width:{{ (c.total/max_cat_h*100)|round }}%;background:#f59e0b;"></div></div>
+                        <div class="chart-bar-value" style="font-size:0.6em;">${{ "%.0f"|format(c.total) }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}<p class="empty-msg">Sin gastos</p>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de gastos del mes -->
+    <div class="section">
+        <div class="section-header"><h2>📋 Gastos del Mes</h2></div>
+        {% set todos_gastos = gastos_personal + gastos_hogar %}
+        {% if todos_gastos %}
+        <div class="card-list">
+            {% for item in todos_gastos %}
+            <div class="card-item">
+                <div class="card-row">
+                    <span class="card-label">Desc</span>
+                    <span class="card-value" style="font-weight:700;">{{ item.descripcion }}</span>
+                </div>
+                <div class="card-row">
+                    <span class="card-label">Monto</span>
+                    <span class="card-value card-value-negative">${{ "%.2f"|format(item.monto) }}</span>
+                </div>
+                <div class="card-row">
+                    <span class="card-label">Categoria</span>
+                    <span class="card-value">
+                        <span class="tag tag-categoria">
+                            <span class="tag-dot" style="background:{% if item.perfil == 'personal' %}#3b82f6{% else %}#f59e0b{% endif %};"></span>
+                            {{ item.categoria }}
+                        </span>
+                    </span>
+                </div>
+                <div class="card-row">
+                    <span class="card-label">Perfil</span>
+                    <span class="card-value">{% if item.perfil == 'personal' %}👤 Personal{% else %}🏠 Hogar{% endif %}</span>
+                </div>
+                <div class="card-row">
+                    <span class="card-label">Fecha</span>
+                    <span class="card-value date-value">{{ fecha_legible(item.fecha) }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-msg">No hay gastos este mes</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="footer-bar">Mis Finanzas 💰</div>
+    </div>
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+</body>
+</html>
