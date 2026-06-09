@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,14 @@
 </head>
 <body>
     <div class="container">
-        <h1>Mis Finanzas Personales</h1>
+        <!-- Header -->
+        <div class="header-bar">
+            <h1>Mis Finanzas</h1>
+            <button class="btn btn-icon" onclick="toggleTheme()" id="themeBtn" title="Cambiar tema">🌙</button>
+        </div>
+
+        <!-- Mes actual -->
+        <div class="mes-label">{{ mes_actual }}</div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -20,137 +27,339 @@
             {% endif %}
         {% endwith %}
 
-        <div class="section">
-            <h2>Ingresos</h2>
-            <a href="{{ url_for('agregar_ingreso') }}" class="btn">Agregar Ingreso</a>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Monto</th>
-                        <th>Descripción</th>
-                        <th>Fecha</th>
-                        <th>Recurrencia</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for ingreso in ingresos %}
-                    <tr>
-                        <td>{{ "%.2f"|format(ingreso.monto) }}</td>
-                        <td>{{ ingreso.descripcion }}</td>
-                        <td>{{ ingreso.fecha }}</td>
-                        <td>{{ ingreso.recurrencia if ingreso.recurrencia else 'N/A' }}</td>
-                        <td>
-                            <a href="{{ url_for('editar_ingreso', id=ingreso.id) }}" class="btn btn-sm">Editar</a>
-                            <form action="{{ url_for('eliminar_ingreso', id=ingreso.id) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- Dashboard - Resumen -->
+        <div class="dashboard-grid">
+            <div class="dash-card dash-ingresos">
+                <div class="dash-icon">↑</div>
+                <div class="dash-label">Ingresos</div>
+                <div class="dash-value">${{ "%.2f"|format(total_ingresos_mes) }}</div>
+            </div>
+            <div class="dash-card dash-gastos">
+                <div class="dash-icon">↓</div>
+                <div class="dash-label">Gastos</div>
+                <div class="dash-value">${{ "%.2f"|format(total_gastos_mes) }}</div>
+            </div>
+            <div class="dash-card dash-balance {% if balance >= 0 %}dash-positivo{% else %}dash-negativo{% endif %}">
+                <div class="dash-icon">$</div>
+                <div class="dash-label">Balance</div>
+                <div class="dash-value">${{ "%.2f"|format(balance) }}</div>
+            </div>
+            <div class="dash-card dash-totals">
+                <div class="dash-icon">📊</div>
+                <div class="dash-label">Totales</div>
+                <div class="dash-value-sm">I: ${{ "%.0f"|format(total_ingresos) }} | G: ${{ "%.0f"|format(total_gastos) }}</div>
+            </div>
         </div>
 
-        <div class="section">
-            <h2>Gastos</h2>
-            <a href="{{ url_for('agregar_gasto') }}" class="btn">Agregar Gasto</a>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Monto</th>
-                        <th>Descripción</th>
-                        <th>Categoría</th>
-                        <th>Fecha</th>
-                        <th>Recurrencia</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for gasto in gastos %}
-                    <tr>
-                        <td>{{ "%.2f"|format(gasto.monto) }}</td>
-                        <td>{{ gasto.descripcion }}</td>
-                        <td>{{ gasto.categoria }}</td>
-                        <td>{{ gasto.fecha }}</td>
-                        <td>{{ gasto.recurrencia if gasto.recurrencia else 'N/A' }}</td>
-                        <td>
-                            <a href="{{ url_for('editar_gasto', id=gasto.id) }}" class="btn btn-sm">Editar</a>
-                            <form action="{{ url_for('eliminar_gasto', id=gasto.id) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- Graficos -->
+        <div class="graficos-section">
+            <div class="grafico-card">
+                <h3>Gastos por Categoria</h3>
+                <div id="graficoCategorias" class="grafico-contenedor">
+                    {% if gastos_categoria %}
+                    <div class="chart-bars">
+                        {% set max_gasto = gastos_categoria[0].total if gastos_categoria else 1 %}
+                        {% for item in gastos_categoria %}
+                        <div class="chart-bar-item">
+                            <div class="chart-bar-label">{{ item.categoria }}</div>
+                            <div class="chart-bar-track">
+                                <div class="chart-bar-fill" style="width: {{ (item.total / max_gasto * 100)|round }}%; background-color: {{ categorias.get(item.categoria, '#95a5a6') }};"></div>
+                            </div>
+                            <div class="chart-bar-value">${{ "%.0f"|format(item.total) }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="empty-msg">Sin datos este mes</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="grafico-card">
+                <h3>Resumen General</h3>
+                <div class="resumen-circulos">
+                    <div class="circulo-item">
+                        <svg viewBox="0 0 36 36" class="circulo-svg">
+                            {% set pct_ing = (total_ingresos / (total_ingresos + total_gastos + 1) * 100)|round %}
+                            <path class="circulo-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                            <path class="circulo-fill circulo-fill-ingresos" stroke-dasharray="{{ pct_ing }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                            <text x="18" y="20.5" class="circulo-texto">{{ pct_ing|int }}%</text>
+                        </svg>
+                        <div class="circulo-label">Ingresos</div>
+                    </div>
+                    <div class="circulo-item">
+                        <svg viewBox="0 0 36 36" class="circulo-svg">
+                            {% set pct_gas = (total_gastos / (total_ingresos + total_gastos + 1) * 100)|round %}
+                            <path class="circulo-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                            <path class="circulo-fill circulo-fill-gastos" stroke-dasharray="{{ pct_gas }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                            <text x="18" y="20.5" class="circulo-texto">{{ pct_gas|int }}%</text>
+                        </svg>
+                        <div class="circulo-label">Gastos</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="section">
-            <h2>Metas de Ahorro</h2>
-            <a href="{{ url_for('agregar_meta') }}" class="btn">Agregar Meta</a>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Monto Objetivo</th>
-                        <th>Monto Actual</th>
-                        <th>Fecha Límite</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for meta in metas %}
-                    <tr>
-                        <td>{{ meta.nombre }}</td>
-                        <td>{{ "%.2f"|format(meta.monto_objetivo) }}</td>
-                        <td>{{ "%.2f"|format(meta.monto_actual) }}</td>
-                        <td>{{ meta.fecha_limite }}</td>
-                        <td>
-                            <a href="{{ url_for('editar_meta', id=meta.id) }}" class="btn btn-sm">Editar</a>
-                            <form action="{{ url_for('eliminar_meta', id=meta.id) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- Barra de exportar y filtros -->
+        <div class="toolbar">
+            <a href="{{ url_for('exportar', tipo='csv') }}" class="btn btn-secondary btn-sm">📥 Exportar CSV</a>
+            <div class="filtro-group">
+                <input type="text" id="filtroBusqueda" placeholder="🔍 Buscar..." class="filtro-input" oninput="filtrarTarjetas()">
+            </div>
         </div>
 
+        <!-- Ingresos -->
+        <div class="section" id="seccion-ingresos">
+            <div class="section-header">
+                <span class="section-badge ingresos"></span>
+                <h2>Ingresos</h2>
+                <a href="{{ url_for('agregar_ingreso') }}" class="btn">+ Nuevo</a>
+            </div>
+            {% if ingresos %}
+            <div class="card-list">
+                {% for item in ingresos %}
+                <div class="card-item" data-search="{{ item.descripcion }} {{ item.monto }} {{ item.fecha }}">
+                    <div class="card-row">
+                        <span class="card-label">Monto</span>
+                        <span class="card-value card-value-positive">${{ "%.2f"|format(item.monto) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Descripción</span>
+                        <span class="card-value">{{ item.descripcion }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Fecha</span>
+                        <span class="card-value date-value" title="{{ item.fecha }}">{{ fecha_legible(item.fecha) }}</span>
+                    </div>
+                    {% if item.recurrencia %}
+                    <div class="card-row">
+                        <span class="card-label">Recurrencia</span>
+                        <span class="card-value"><span class="tag tag-recurrencia">{{ item.recurrencia }}</span></span>
+                    </div>
+                    {% endif %}
+                    <div class="card-actions">
+                        <a href="{{ url_for('editar_ingreso', id=item.id) }}" class="btn btn-sm">Editar</a>
+                        <form action="{{ url_for('eliminar_ingreso', id=item.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar este ingreso?')">Eliminar</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-msg">No hay ingresos registrados aún.</p>
+            {% endif %}
+        </div>
+
+        <!-- Gastos -->
+        <div class="section" id="seccion-gastos">
+            <div class="section-header">
+                <span class="section-badge gastos"></span>
+                <h2>Gastos</h2>
+                <a href="{{ url_for('agregar_gasto') }}" class="btn">+ Nuevo</a>
+            </div>
+            {% if gastos %}
+            <div class="card-list">
+                {% for item in gastos %}
+                <div class="card-item" data-search="{{ item.descripcion }} {{ item.categoria }} {{ item.monto }} {{ item.fecha }}">
+                    <div class="card-row">
+                        <span class="card-label">Monto</span>
+                        <span class="card-value card-value-negative">${{ "%.2f"|format(item.monto) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Descripción</span>
+                        <span class="card-value">{{ item.descripcion }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Categoría</span>
+                        <span class="card-value">
+                            <span class="tag tag-categoria" style="background-color: {{ categorias.get(item.categoria, '#95a5a6') }}20; color: {{ categorias.get(item.categoria, '#95a5a6') }}; border: 1px solid {{ categorias.get(item.categoria, '#95a5a6') }}40;">
+                                <span class="tag-dot" style="background-color: {{ categorias.get(item.categoria, '#95a5a6') }};"></span>
+                                {{ item.categoria }}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Fecha</span>
+                        <span class="card-value date-value" title="{{ item.fecha }}">{{ fecha_legible(item.fecha) }}</span>
+                    </div>
+                    {% if item.recurrencia %}
+                    <div class="card-row">
+                        <span class="card-label">Recurrencia</span>
+                        <span class="card-value"><span class="tag tag-recurrencia">{{ item.recurrencia }}</span></span>
+                    </div>
+                    {% endif %}
+                    {% if item.comprobante %}
+                    <div class="card-row">
+                        <span class="card-label">Comprobante</span>
+                        <span class="card-value">
+                            <a href="{{ url_for('static', filename='comprobantes/' + item.comprobante) }}" target="_blank" class="btn btn-sm btn-secondary">📷 Ver</a>
+                        </span>
+                    </div>
+                    {% endif %}
+                    <div class="card-actions">
+                        <a href="{{ url_for('editar_gasto', id=item.id) }}" class="btn btn-sm">Editar</a>
+                        <form action="{{ url_for('eliminar_gasto', id=item.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar este gasto?')">Eliminar</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-msg">No hay gastos registrados aún.</p>
+            {% endif %}
+        </div>
+
+        <!-- Metas -->
         <div class="section">
-            <h2>Deudas</h2>
-            <a href="{{ url_for('agregar_deuda') }}" class="btn">Agregar Deuda</a>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Monto Total</th>
-                        <th>Monto Pagado</th>
-                        <th>Fecha Inicio</th>
-                        <th>Fecha Fin Estimada</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for deuda in deudas %}
-                    <tr>
-                        <td>{{ deuda.nombre }}</td>
-                        <td>{{ "%.2f"|format(deuda.monto_total) }}</td>
-                        <td>{{ "%.2f"|format(deuda.monto_pagado) }}</td>
-                        <td>{{ deuda.fecha_inicio }}</td>
-                        <td>{{ deuda.fecha_fin_estimada if deuda.fecha_fin_estimada else 'N/A' }}</td>
-                        <td>
-                            <a href="{{ url_for('editar_deuda', id=deuda.id) }}" class="btn btn-sm">Editar</a>
-                            <form action="{{ url_for('eliminar_deuda', id=deuda.id) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="section-header">
+                <span class="section-badge metas"></span>
+                <h2>Metas de Ahorro</h2>
+                <a href="{{ url_for('agregar_meta') }}" class="btn">+ Nueva</a>
+            </div>
+            {% if metas %}
+            <div class="card-list">
+                {% for item in metas %}
+                {% set progreso = (item.monto_actual / item.monto_objetivo * 100)|round if item.monto_objetivo > 0 else 0 %}
+                <div class="card-item" data-search="{{ item.nombre }} {{ item.monto_objetivo }}">
+                    <div class="card-row">
+                        <span class="card-label">Nombre</span>
+                        <span class="card-value">{{ item.nombre }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Objetivo</span>
+                        <span class="card-value card-value-positive">${{ "%.2f"|format(item.monto_objetivo) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Actual</span>
+                        <span class="card-value">${{ "%.2f"|format(item.monto_actual) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Fecha Límite</span>
+                        <span class="card-value date-value" title="{{ item.fecha_limite }}">{{ fecha_legible(item.fecha_limite) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Progreso</span>
+                        <span class="card-value">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ progreso }}%;"></div>
+                            </div>
+                            <small>{{ progreso|int }}%</small>
+                        </span>
+                    </div>
+                    <div class="card-actions">
+                        <a href="{{ url_for('editar_meta', id=item.id) }}" class="btn btn-sm">Editar</a>
+                        <form action="{{ url_for('eliminar_meta', id=item.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar esta meta?')">Eliminar</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-msg">No hay metas de ahorro registradas aún.</p>
+            {% endif %}
+        </div>
+
+        <!-- Deudas -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-badge deudas"></span>
+                <h2>Deudas</h2>
+                <a href="{{ url_for('agregar_deuda') }}" class="btn">+ Nueva</a>
+            </div>
+            {% if deudas %}
+            <div class="card-list">
+                {% for item in deudas %}
+                {% set pct_pagado = (item.monto_pagado / item.monto_total * 100)|round if item.monto_total > 0 else 0 %}
+                <div class="card-item" data-search="{{ item.nombre }} {{ item.monto_total }}">
+                    <div class="card-row">
+                        <span class="card-label">Nombre</span>
+                        <span class="card-value">{{ item.nombre }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Total</span>
+                        <span class="card-value card-value-negative">${{ "%.2f"|format(item.monto_total) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Pagado</span>
+                        <span class="card-value">${{ "%.2f"|format(item.monto_pagado) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Pendiente</span>
+                        <span class="card-value card-value-negative">${{ "%.2f"|format(item.monto_total - item.monto_pagado) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Inicio</span>
+                        <span class="card-value date-value" title="{{ item.fecha_inicio }}">{{ fecha_legible(item.fecha_inicio) }}</span>
+                    </div>
+                    {% if item.fecha_fin_estimada %}
+                    <div class="card-row">
+                        <span class="card-label">Fin Est.</span>
+                        <span class="card-value date-value">{{ fecha_legible(item.fecha_fin_estimada) }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="card-row">
+                        <span class="card-label">Progreso</span>
+                        <span class="card-value">
+                            <div class="progress-bar progress-bar-deuda">
+                                <div class="progress-fill progress-fill-deuda" style="width: {{ pct_pagado }}%;"></div>
+                            </div>
+                            <small>{{ pct_pagado|int }}%</small>
+                        </span>
+                    </div>
+                    <div class="card-actions">
+                        <a href="{{ url_for('editar_deuda', id=item.id) }}" class="btn btn-sm">Editar</a>
+                        <form action="{{ url_for('eliminar_deuda', id=item.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar esta deuda?')">Eliminar</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-msg">No hay deudas registradas aún.</p>
+            {% endif %}
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <small>App de Finanzas Personales - v2.0</small>
         </div>
     </div>
+
+    <script>
+        // Filtro de busqueda
+        function filtrarTarjetas() {
+            const q = document.getElementById('filtroBusqueda').value.toLowerCase();
+            document.querySelectorAll('.card-item').forEach(c => {
+                c.style.display = (!q || c.dataset.search.toLowerCase().includes(q)) ? '' : 'none';
+            });
+        }
+
+        // Tema oscuro/claro
+        function toggleTheme() {
+            const html = document.documentElement;
+            const btn = document.getElementById('themeBtn');
+            if (html.getAttribute('data-theme') === 'dark') {
+                html.setAttribute('data-theme', 'light');
+                btn.textContent = '🌙';
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.setAttribute('data-theme', 'dark');
+                btn.textContent = '☀️';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // Cargar tema guardado
+        (function() {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.getElementById('themeBtn').textContent = '☀️';
+            }
+        })();
+    </script>
 </body>
 </html>

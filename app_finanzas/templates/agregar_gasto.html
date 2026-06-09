@@ -1,14 +1,29 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agregar Gasto</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .form-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .form-checkbox label { margin: 0; }
+        .form-checkbox input[type="checkbox"] { width: auto; margin: 0; }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h1>Agregar Nuevo Gasto</h1>
+        <div class="header-bar">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">← Volver</a>
+            <h1 style="font-size:1em;">Nuevo Gasto</h1>
+            <div></div>
+        </div>
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="messages">
@@ -18,29 +33,37 @@
                 </div>
             {% endif %}
         {% endwith %}
-        <form method="POST">
-            <label for="monto">Monto:</label>
-            <input type="number" id="monto" name="monto" step="0.01" required>
 
-            <label for="descripcion">Descripción:</label>
-            <input type="text" id="descripcion" name="descripcion" required>
+        <form method="POST" enctype="multipart/form-data">
+            <label for="monto">Monto ($)</label>
+            <input type="number" id="monto" name="monto" step="0.01" placeholder="0.00" required>
 
-            <label for="categoria">Categoría:</label>
-            <input type="text" id="categoria" name="categoria" required>
+            <label for="descripcion">Descripción</label>
+            <input type="text" id="descripcion" name="descripcion" placeholder="Ej: Supermercado">
 
-            <label for="fecha">Fecha:</label>
-            <input type="date" id="fecha" name="fecha" value="{{ today }}" required>
+            <label for="categoria">Categoría</label>
+            <select id="categoria" name="categoria" required>
+                <option value="">Seleccionar...</option>
+                {% for cat in categorias %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+            </select>
 
-            <label for="recurrencia">Recurrencia:</label>
+            <label for="fecha">Fecha</label>
+            <input type="date" id="fecha" name="fecha" value="{{ hoy }}" required>
+
+            <label for="recurrencia">Recurrencia</label>
             <select id="recurrencia" name="recurrencia">
-                <option value="">Ninguna</option>
+                <option value="">No recurrente</option>
                 <option value="Semanal">Semanal</option>
                 <option value="Quincenal">Quincenal</option>
                 <option value="Mensual">Mensual</option>
             </select>
 
-            <button type="submit" class="btn">Guardar Gasto</button>
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancelar</a>
+            <label for="comprobante">Comprobante (opcional)</label>
+            <input type="file" id="comprobante" name="comprobante" accept="image/*">
+
+            <button type="submit">Guardar Gasto</button>
         </form>
     </div>
 </body>

@@ -1,14 +1,18 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agregar Meta de Ahorro</title>
+    <title>Agregar Meta</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Agregar Nueva Meta de Ahorro</h1>
+        <div class="header-bar">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">← Volver</a>
+            <h1 style="font-size:1em;">Nueva Meta de Ahorro</h1>
+            <div></div>
+        </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="messages">
@@ -19,17 +23,16 @@
             {% endif %}
         {% endwith %}
         <form method="POST">
-            <label for="nombre">Nombre de la Meta:</label>
-            <input type="text" id="nombre" name="nombre" required>
+            <label for="nombre">Nombre de la Meta</label>
+            <input type="text" id="nombre" name="nombre" placeholder="Ej: Viaje a la playa" required>
 
-            <label for="monto_objetivo">Monto Objetivo:</label>
-            <input type="number" id="monto_objetivo" name="monto_objetivo" step="0.01" required>
+            <label for="monto_objetivo">Monto Objetivo ($)</label>
+            <input type="number" id="monto_objetivo" name="monto_objetivo" step="0.01" placeholder="0.00" required>
 
-            <label for="fecha_limite">Fecha Límite:</label>
-            <input type="date" id="fecha_limite" name="fecha_limite" required>
+            <label for="fecha_limite">Fecha Límite</label>
+            <input type="date" id="fecha_limite" name="fecha_limite" value="{{ hoy }}" required>
 
-            <button type="submit" class="btn">Guardar Meta</button>
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit">Guardar Meta</button>
         </form>
     </div>
 </body>

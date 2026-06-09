@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,11 @@
 </head>
 <body>
     <div class="container">
-        <h1>Agregar Nuevo Ingreso</h1>
+        <div class="header-bar">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">← Volver</a>
+            <h1 style="font-size:1em;">Nuevo Ingreso</h1>
+            <div></div>
+        </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="messages">
@@ -19,25 +23,24 @@
             {% endif %}
         {% endwith %}
         <form method="POST">
-            <label for="monto">Monto:</label>
-            <input type="number" id="monto" name="monto" step="0.01" required>
+            <label for="monto">Monto ($)</label>
+            <input type="number" id="monto" name="monto" step="0.01" placeholder="0.00" required>
 
-            <label for="descripcion">Descripción:</label>
-            <input type="text" id="descripcion" name="descripcion" required>
+            <label for="descripcion">Descripción</label>
+            <input type="text" id="descripcion" name="descripcion" placeholder="Ej: Salario" required>
 
-            <label for="fecha">Fecha:</label>
-            <input type="date" id="fecha" name="fecha" value="{{ today }}" required>
+            <label for="fecha">Fecha</label>
+            <input type="date" id="fecha" name="fecha" value="{{ hoy }}" required>
 
-            <label for="recurrencia">Recurrencia:</label>
+            <label for="recurrencia">Recurrencia</label>
             <select id="recurrencia" name="recurrencia">
-                <option value="">Ninguna</option>
+                <option value="">No recurrente</option>
                 <option value="Semanal">Semanal</option>
                 <option value="Quincenal">Quincenal</option>
                 <option value="Mensual">Mensual</option>
             </select>
 
-            <button type="submit" class="btn">Guardar Ingreso</button>
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit">Guardar Ingreso</button>
         </form>
     </div>
 </body>

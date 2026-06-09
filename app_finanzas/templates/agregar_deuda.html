@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,11 @@
 </head>
 <body>
     <div class="container">
-        <h1>Agregar Nueva Deuda</h1>
+        <div class="header-bar">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">← Volver</a>
+            <h1 style="font-size:1em;">Nueva Deuda</h1>
+            <div></div>
+        </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="messages">
@@ -19,20 +23,19 @@
             {% endif %}
         {% endwith %}
         <form method="POST">
-            <label for="nombre">Nombre de la Deuda:</label>
-            <input type="text" id="nombre" name="nombre" required>
+            <label for="nombre">Nombre de la Deuda</label>
+            <input type="text" id="nombre" name="nombre" placeholder="Ej: Préstamo bancario" required>
 
-            <label for="monto_total">Monto Total:</label>
-            <input type="number" id="monto_total" name="monto_total" step="0.01" required>
+            <label for="monto_total">Monto Total ($)</label>
+            <input type="number" id="monto_total" name="monto_total" step="0.01" placeholder="0.00" required>
 
-            <label for="fecha_inicio">Fecha de Inicio:</label>
-            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ today }}" required>
+            <label for="fecha_inicio">Fecha de Inicio</label>
+            <input type="date" id="fecha_inicio" name="fecha_inicio" value="{{ hoy }}" required>
 
-            <label for="fecha_fin_estimada">Fecha Fin Estimada:</label>
+            <label for="fecha_fin_estimada">Fecha Fin Estimada (opcional)</label>
             <input type="date" id="fecha_fin_estimada" name="fecha_fin_estimada">
 
-            <button type="submit" class="btn">Guardar Deuda</button>
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit">Guardar Deuda</button>
         </form>
     </div>
 </body>
