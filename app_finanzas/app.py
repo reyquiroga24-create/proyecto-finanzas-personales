@@ -198,7 +198,7 @@ def index(perfil='personal'):
             ahorros=ahorros,
             total_ahorrado_personal=total_ahorrado_personal,
             total_meta_personal=total_meta_personal,
-            es_resumen=False)
+            es_resumen=False, date=date)
 
     elif perfil == 'hogar':  # hogar - tiene calendario y pagos
         gastos = conn.execute('SELECT * FROM gastos WHERE perfil=? ORDER BY fecha DESC', (perfil,)).fetchall()

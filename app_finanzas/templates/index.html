@@ -77,13 +77,16 @@
         <div class="section-header">
             <h2>📊 Gastos por Categoría</h2>
         </div>
-        <div class="chart-bars">
-            {% set max_g = gastos_categoria[0].total if gastos_categoria else 1 %}
+        <div class="resumen-circulos" id="pieChart">
             {% for item in gastos_categoria %}
-            <div class="chart-bar-item">
-                <div class="chart-bar-label">{{ item.categoria }}</div>
-                <div class="chart-bar-track"><div class="chart-bar-fill" style="width:{{ (item.total/max_g*100)|round }}%; background:{{ categorias.get(item.categoria,'#95a5a6') }};"></div></div>
-                <div class="chart-bar-value">${{ "%.0f"|format(item.total) }}</div>
+            {% set pct = (item.total / max_g * 100)|round %}
+            <div class="circulo-item" title="{{ item.categoria }}: ${{ '%.0f'|format(item.total) }}">
+                <svg class="circulo-svg" viewBox="0 0 36 36">
+                    <path class="circulo-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    <path class="circulo-fill" stroke="{{ categorias.get(item.categoria,'#95a5a6') }}" stroke-dasharray="{{ pct }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    <text x="18" y="20" class="circulo-texto">{{ pct|int }}%</text>
+                </svg>
+                <div class="circulo-label">{{ item.categoria[:8] }}</div>
             </div>
             {% endfor %}
         </div>
@@ -763,6 +766,74 @@
     </div>
     {% endif %}
 
+    <!-- FAB (solo en personal y hogar) -->
+    {% if perfil_activo == 'personal' or perfil_activo == 'hogar' %}
+    <div class="fab-menu" id="fabMenu">
+        <a href="{{ url_for('agregar_gasto', perfil=perfil_activo) }}" class="fab-option">
+            <span class="fab-icon fab-fast-gasto">💸</span>
+            Nuevo Gasto
+        </a>
+        <a href="{{ url_for('index', perfil='resumen') }}#ingresos" class="fab-option">
+            <span class="fab-icon fab-fast-ingreso">📥</span>
+            Nuevo Ingreso
+        </a>
+        <div class="fab-option" onclick="openQuickPago()">
+            <span class="fab-icon fab-fast-pago">🔄</span>
+            Pago Rápido
+        </div>
+    </div>
+    <a href="#" class="fab" id="fabBtn" onclick="toggleFab(event)">+</a>
+    {% endif %}
+
+    <!-- QUICK FORM: Pago Rápido -->
+    <div class="quick-form-overlay" id="quickPagoOverlay">
+        <div class="quick-form">
+            <div class="quick-form-header">
+                <h3>🔄 Pago Rápido</h3>
+                <button class="btn btn-sm btn-secondary" onclick="closeQuickPago()">✕</button>
+            </div>
+            <form method="POST" action="{{ url_for('agregar_gasto', perfil=perfil_activo) }}" enctype="multipart/form-data">
+                <input type="hidden" name="categoria" value="Servicio">
+                <div class="form-row">
+                    <input type="number" name="monto" step="0.01" placeholder="$ Monto" required>
+                </div>
+                <div class="form-row">
+                    <input type="text" name="descripcion" placeholder="¿Qué pagaste?" required>
+                </div>
+                <div class="form-row">
+                    <input type="date" name="fecha" value="{{ date.today().isoformat() if perfil_activo == 'hogar' else '' }}" required>
+                </div>
+                <div class="form-row">
+                    <select name="categoria">
+                        {% if perfil_activo == 'personal' %}
+                        <option value="Comida">Comida</option>
+                        <option value="Compras">Compras</option>
+                        <option value="Transporte">Transporte</option>
+                        <option value="Entretenimiento">Entretenimiento</option>
+                        <option value="Salud">Salud</option>
+                        <option value="Suscripciones">Suscripciones</option>
+                        <option value="Otros">Otros</option>
+                        {% else %}
+                        <option value="Luz">Luz</option>
+                        <option value="Agua">Agua</option>
+                        <option value="Internet">Internet</option>
+                        <option value="Celular">Celular</option>
+                        <option value="Renta">Renta</option>
+                        <option value="Despensa">Despensa</option>
+                        <option value="Gas">Gas</option>
+                        <option value="Mantenimiento">Mantenimiento</option>
+                        <option value="Otros">Otros</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <input type="file" name="comprobante" accept="image/*" capture="environment" style="flex:1;padding:6px;font-size:0.8em;">
+                </div>
+                <button type="submit" class="btn" style="width:100%;">💾 Guardar Gasto Rápido</button>
+            </form>
+        </div>
+    </div>
+
     <!-- FOOTER -->
     <div class="footer-bar">
         Mis Finanzas 💰
@@ -847,6 +918,65 @@ document.querySelectorAll('input[type="file"]').forEach(input => {
                 }
             }.bind(this);
             reader.readAsDataURL(this.files[0]);
+        }
+    });
+});
+
+// ========== FAB ==========
+function toggleFab(e) {
+    e.preventDefault();
+    const menu = document.getElementById('fabMenu');
+    menu.classList.toggle('show');
+}
+
+// Cerrar FAB al tocar fuera
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('fabMenu');
+    const fab = document.getElementById('fabBtn');
+    if (menu && fab && !menu.contains(e.target) && !fab.contains(e.target)) {
+        menu.classList.remove('show');
+    }
+});
+
+// ========== QUICK PAGO ==========
+function openQuickPago() {
+    document.getElementById('fabMenu').classList.remove('show');
+    document.getElementById('quickPagoOverlay').classList.add('show');
+}
+function closeQuickPago() {
+    document.getElementById('quickPagoOverlay').classList.remove('show');
+}
+
+// ========== CALENDARIO INTERACTIVO ==========
+document.querySelectorAll('.cal-dia:not(.cal-vacio)').forEach(function(dia) {
+    dia.style.cursor = 'pointer';
+    dia.addEventListener('click', function() {
+        const diaNum = this.querySelector('.cal-numero')?.textContent;
+        if (!diaNum) return;
+        // Buscar gastos de ese dia en la lista y resaltarlos
+        const gastos = document.querySelectorAll('.card-item');
+        let found = 0;
+        gastos.forEach(function(g) {
+            const fechaEl = g.querySelector('.date-value');
+            if (fechaEl) {
+                const txt = fechaEl.textContent.toLowerCase();
+                // Buscar el numero de dia en el texto de fecha
+                if (txt.includes(' ' + diaNum + ' ') || txt.includes(diaNum + ' de')) {
+                    g.style.scrollMarginTop = '100px';
+                    g.style.borderLeft = '3px solid var(--blue)';
+                    g.style.background = 'var(--blue-light)';
+                    found++;
+                    setTimeout(() => {
+                        g.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                } else {
+                    g.style.borderLeft = '';
+                    g.style.background = '';
+                }
+            }
+        });
+        if (found === 0) {
+            showNotif('No hay gastos registrados el día ' + diaNum, 3000);
         }
     });
 });
