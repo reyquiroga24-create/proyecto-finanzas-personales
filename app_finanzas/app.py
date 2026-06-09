@@ -653,6 +653,51 @@ def eliminar_plan(perfil, id):
     flash('Plan de pago eliminado!', 'success')
     return redirect(url_for('index', perfil=perfil))
 
+# ---- Recordatorios ----
+@app.route('/api/recordatorios/<perfil>')
+def api_recordatorios(perfil):
+    conn = get_db()
+    hoy = date.today()
+    # Pagos programados (recurrentes) en los proximos 3 dias
+    recordatorios = []
+    pagos = conn.execute(
+        'SELECT * FROM pagos_programados WHERE perfil=? AND activo=1 ORDER BY dia_vencimiento',
+        (perfil,)).fetchall()
+    for p in pagos:
+        dia = p['dia_vencimiento']
+        # Verificar si el dia de vencimiento cae en los proximos 3 dias (considerando cambio de mes)
+        if dia >= hoy.day and dia <= hoy.day + 3:
+            dias_rest = dia - hoy.day
+            recordatorios.append({
+                'tipo': 'pago_recurrente',
+                'nombre': p['nombre'],
+                'monto': p['monto'],
+                'dia': dia,
+                'faltan': dias_rest
+            })
+        elif dia < hoy.day:
+            # Pago del proximo mes
+            pass
+    # Abonos de planes de pago en los proximos 3 dias
+    abonos = conn.execute(
+        "SELECT a.*, p.nombre as plan_nombre FROM abonos_pago a JOIN planes_pago p ON a.plan_id=p.id WHERE a.pagado=0 AND p.perfil=?",
+        (perfil,)).fetchall()
+    for a in abonos:
+        try:
+            fd = datetime.strptime(a['fecha'], '%Y-%m-%d').date()
+            diff = (fd - hoy).days
+            if 0 <= diff <= 3:
+                recordatorios.append({
+                    'tipo': 'abono',
+                    'nombre': a['plan_nombre'],
+                    'monto': a['monto'],
+                    'dia': fd.day,
+                    'faltan': diff
+                })
+        except: pass
+    conn.close()
+    return jsonify(recordatorios)
+
 if __name__ == '__main__':
     init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)
