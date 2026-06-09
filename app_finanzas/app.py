@@ -86,6 +86,15 @@ def init_db():
         nombre TEXT NOT NULL, monto_objetivo REAL NOT NULL,
         monto_actual REAL DEFAULT 0.0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS planes_pago (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, perfil TEXT NOT NULL DEFAULT 'hogar',
+        nombre TEXT NOT NULL, monto_total REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS abonos_pago (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, plan_id INTEGER NOT NULL,
+        monto REAL NOT NULL, fecha TEXT NOT NULL,
+        pagado INTEGER DEFAULT 0,
+        FOREIGN KEY (plan_id) REFERENCES planes_pago(id))""")
     # Migrar columna perfil si no existe
     try:
         c.execute('ALTER TABLE gastos ADD COLUMN perfil TEXT NOT NULL DEFAULT "personal"')
@@ -221,6 +230,10 @@ def index(perfil='personal'):
         for d in range(1, ultimo + 1):
             fecha_d = date(hoy.year, hoy.month, d)
             pagos_dia = [p for p in pagos if p['dia_vencimiento'] == d]
+            # Abonos de planes de pago para este dia
+            abonos_hoy = conn.execute(
+                "SELECT a.*, p.nombre as plan_nombre FROM abonos_pago a JOIN planes_pago p ON a.plan_id=p.id WHERE a.fecha=? AND a.pagado=0 AND p.perfil=?",
+                (fecha_d.isoformat(), perfil)).fetchall()
             gastos_dia = conn.execute(
                 "SELECT COUNT(*), COALESCE(SUM(monto),0) FROM gastos WHERE perfil=? AND fecha=?",
                 (perfil, fecha_d.isoformat())).fetchone()
@@ -228,19 +241,25 @@ def index(perfil='personal'):
                 'dia': d,
                 'hoy': fecha_d == hoy,
                 'pagos': [dict(p) for p in pagos_dia],
+                'abonos': [dict(a) for a in abonos_hoy],
                 'tiene_gastos': gastos_dia[0] > 0,
                 'total_gastos': gastos_dia[1],
             })
+
+        # Planes de pago activos
+        planes = conn.execute(
+            "SELECT p.*, COALESCE(SUM(a.monto),0) as total_abonos, COALESCE(SUM(CASE WHEN a.pagado=1 THEN a.monto ELSE 0 END),0) as total_pagado FROM planes_pago p LEFT JOIN abonos_pago a ON a.plan_id=p.id WHERE p.perfil=? GROUP BY p.id ORDER BY p.nombre",
+            (perfil,)).fetchall()
 
         conn.close()
         return render_template('index.html',
             perfiles=PERFILES, perfil_activo=perfil,
             gastos=gastos, ingresos=[], metas=[], deudas=[],
-            fecha_legible=fecha_legible,
+            fecha_legible=fecha_legible, date=date,
             total_mes=total_mes, total_general=total_general,
             gastos_categoria=gastos_categoria,
             categorias=CATEGORIAS.get(perfil, {}),
-            pagos=pagos, dias_mes=dias_mes,
+            pagos=pagos, dias_mes=dias_mes, planes=planes,
             presupuesto_recibido=presupuesto_recibido,
             mes_actual=f"{MESES_ES[hoy.month]} {hoy.year}",
             mes_num=hoy.month, anio=hoy.year,
@@ -577,6 +596,47 @@ def eliminar_ahorro(id):
     conn.commit(); conn.close()
     flash('Meta eliminada!', 'success')
     return redirect(url_for('index', perfil='personal'))
+
+# ---- Planes de Pago (Hogar) ----
+@app.route('/crear_plan_pago/<perfil>', methods=('POST',))
+def crear_plan_pago(perfil):
+    nombre = request.form.get('nombre')
+    monto_total = request.form.get('monto_total')
+    if nombre and monto_total:
+        conn = get_db()
+        conn.execute('INSERT INTO planes_pago (perfil, nombre, monto_total) VALUES (?,?,?)', (perfil, nombre, float(monto_total)))
+        conn.commit(); conn.close()
+        flash('Plan de pago creado!', 'success')
+    return redirect(url_for('index', perfil=perfil))
+
+@app.route('/agregar_abono/<perfil>', methods=('POST',))
+def agregar_abono(perfil):
+    plan_id = request.form.get('plan_id')
+    monto = request.form.get('monto')
+    fecha = request.form.get('fecha')
+    if plan_id and monto and fecha:
+        conn = get_db()
+        conn.execute('INSERT INTO abonos_pago (plan_id, monto, fecha) VALUES (?,?,?)', (int(plan_id), float(monto), fecha))
+        conn.commit(); conn.close()
+        flash('Abono agregado al calendario!', 'success')
+    return redirect(url_for('index', perfil=perfil))
+
+@app.route('/marcar_pagado/<perfil>/<int:id>', methods=('POST',))
+def marcar_pagado(perfil, id):
+    conn = get_db()
+    conn.execute('UPDATE abonos_pago SET pagado=1 WHERE id=?', (id,))
+    conn.commit(); conn.close()
+    flash('Abono marcado como pagado!', 'success')
+    return redirect(url_for('index', perfil=perfil))
+
+@app.route('/eliminar_plan/<perfil>/<int:id>', methods=('POST',))
+def eliminar_plan(perfil, id):
+    conn = get_db()
+    conn.execute('DELETE FROM abonos_pago WHERE plan_id=?', (id,))
+    conn.execute('DELETE FROM planes_pago WHERE id=?', (id,))
+    conn.commit(); conn.close()
+    flash('Plan de pago eliminado!', 'success')
+    return redirect(url_for('index', perfil=perfil))
 
 if __name__ == '__main__':
     init_db()

@@ -122,7 +122,7 @@
                     {% for d in dias_semana %}<div class="cal-dia-nombre">{{ d }}</div>{% endfor %}
                     {% for d in range(dias_mes[0].dia - 1) %}<div class="cal-dia cal-vacio"></div>{% endfor %}
                     {% for dia in dias_mes %}
-                    <div class="cal-dia {% if dia.hoy %}cal-hoy{% endif %} {% if dia.pagos %}cal-tiene-pago{% endif %} {% if dia.tiene_gastos %}cal-tiene-gasto{% endif %}">
+                    <div class="cal-dia {% if dia.hoy %}cal-hoy{% endif %} {% if dia.pagos or dia.abonos %}cal-tiene-pago{% endif %} {% if dia.tiene_gastos %}cal-tiene-gasto{% endif %}">
                         <span class="cal-numero">{{ dia.dia }}</span>
                         {% if dia.pagos %}
                         <div class="cal-pagos">
@@ -130,6 +130,19 @@
                             <div class="cal-pago-item" title="{{ p.nombre }}: ${{ '%.2f'|format(p.monto) }}">
                                 <span>{{ p.nombre[:6] }}</span>
                                 <span>${{ "%.0f"|format(p.monto) }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% if dia.abonos %}
+                        <div class="cal-pagos" style="margin-top:1px;">
+                            {% for a in dia.abonos %}
+                            <div class="cal-pago-item cal-abono" title="{{ a.plan_nombre }} abono: ${{ '%.2f'|format(a.monto) }}" style="background:#e67e22;">
+                                <span>{{ a.plan_nombre[:6] }}</span>
+                                <span>${{ "%.0f"|format(a.monto) }}</span>
+                                <form action="{{ url_for('marcar_pagado', perfil='hogar', id=a.id) }}" method="POST" style="display:inline;margin-left:1px;">
+                                    <button type="submit" style="background:none;border:none;color:#fff;cursor:pointer;font-size:0.7em;padding:0;">✓</button>
+                                </form>
                             </div>
                             {% endfor %}
                         </div>
@@ -401,6 +414,96 @@
                 </div>
                 {% endfor %}
             </div>
+            {% endif %}
+        </div>
+
+        <!-- PLANES DE PAGO (ARREGLOS) -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-badge deudas"></span>
+                <h2>🔄 Arreglos de Pago</h2>
+                <button class="btn btn-sm" onclick="document.getElementById('planModal').classList.toggle('show')">+ Nuevo Plan</button>
+            </div>
+
+            <!-- Modal crear plan -->
+            <div id="planModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Nuevo Plan de Pago</h3>
+                        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('planModal').classList.remove('show')">✕</button>
+                    </div>
+                    <form action="{{ url_for('crear_plan_pago', perfil='hogar') }}" method="POST">
+                        <label>¿Qué servicio/deuda es?</label>
+                        <input type="text" name="nombre" placeholder="Ej: Luz" required>
+                        <label>Monto total</label>
+                        <input type="number" name="monto_total" step="0.01" required>
+                        <button type="submit">Crear Plan</button>
+                    </form>
+                    <p style="font-size:0.75em;color:var(--text-secondary);margin-top:8px;">Después de crear el plan, agrega los abonos (pagos parciales) abajo.</p>
+                </div>
+            </div>
+
+            {% if planes %}
+            {% for plan in planes %}
+            {% set restante = plan.total_abonos - plan.total_pagado %}
+            <div class="card-item" style="margin-bottom:8px;">
+                <div class="card-row">
+                    <span class="card-label">Servicio</span>
+                    <span class="card-value" style="font-weight:700;">{{ plan.nombre }}</span>
+                </div>
+                <div class="card-row">
+                    <span class="card-label">Total</span>
+                    <span class="card-value card-value-negative">${{ "%.2f"|format(plan.monto_total) }}</span>
+                </div>
+                <div class="card-row">
+                    <span class="card-label">Pagado</span>
+                    <span class="card-value">${{ "%.2f"|format(plan.total_pagado) }}</span>
+                </div>
+                <div class="card-row">
+                    <span class="card-label">Pendiente</span>
+                    <span class="card-value card-value-negative">${{ "%.2f"|format(plan.monto_total - plan.total_pagado) }}</span>
+                </div>
+
+                <!-- Agregar abono -->
+                <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+                    <form action="{{ url_for('agregar_abono', perfil='hogar') }}" method="POST" style="display:flex;gap:4px;padding:0;border:none;box-shadow:none;background:none;margin:0;align-items:center;flex-wrap:wrap;">
+                        <input type="hidden" name="plan_id" value="{{ plan.id }}">
+                        <input type="number" name="monto" step="0.01" placeholder="$ Abono" style="width:80px;padding:5px 6px;border:1px solid var(--input-border);border-radius:4px;font-size:0.75em;background:var(--input-bg);color:var(--text);">
+                        <input type="date" name="fecha" value="{{ '%Y-%m-%d'|format(date.today()) }}" style="width:130px;padding:5px 6px;border:1px solid var(--input-border);border-radius:4px;font-size:0.75em;background:var(--input-bg);color:var(--text);">
+                        <button type="submit" class="btn btn-sm">➕ Abono</button>
+                    </form>
+                </div>
+
+                <!-- Abonos de este plan -->
+                {% set abonos_plan = namespace(items=[]) %}
+                {% for d in dias_mes %}
+                {% for a in d.abonos %}
+                {% if a.plan_id == plan.id %}
+                <div class="pago-row" style="margin-top:4px;">
+                    <div class="pago-info">
+                        <span class="pago-dia">Día {{ d.dia }} - ${{ "%.2f"|format(a.monto) }}</span>
+                    </div>
+                    {% if a.pagado %}
+                    <span style="color:var(--green);font-weight:600;font-size:0.8em;">✅ Pagado</span>
+                    {% else %}
+                    <form action="{{ url_for('marcar_pagado', perfil='hogar', id=a.id) }}" method="POST" style="display:inline;margin:0;">
+                        <button type="submit" class="btn btn-sm" style="padding:3px 8px;font-size:0.7em;">✓ Pagar</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% endfor %}
+                {% endfor %}
+
+                <div class="card-actions" style="margin-top:6px;">
+                    <form action="{{ url_for('eliminar_plan', perfil='hogar', id=plan.id) }}" method="POST" style="display:inline;margin:0;">
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar plan {{ plan.nombre }} y todos sus abonos?')">Eliminar Plan</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="empty-msg">No hay planes de pago activos. Crea uno para dividir un pago en varios abonos.</p>
             {% endif %}
         </div>
 
