@@ -93,11 +93,16 @@
     </div>
     {% endif %}
 
-    <!-- Calendario -->
+    <!-- Calendario Personal -->
     <div class="section">
         <div class="section-header">
             <h2>📅 Calendario</h2>
             <a href="{{ url_for('agregar_gasto', perfil=perfil_activo) }}" class="btn btn-sm btn-success">+ Gasto</a>
+        </div>
+        <div class="month-nav" style="margin-bottom:8px;">
+            <a href="?mes={{ mes_ant }}&anio={{ anio_ant }}" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:0.7em;">‹ {{ MESES_ES[mes_ant][:3] }}</a>
+            <span style="font-size:0.85em;font-weight:700;color:var(--text);">{{ MESES_ES[mes_ver] }} {{ anio_ver }}</span>
+            <a href="?mes={{ mes_sig }}&anio={{ anio_sig }}" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:0.7em;">{{ MESES_ES[mes_sig][:3] }} ›</a>
         </div>
         <div class="calendario">
             <div class="cal-grid">
@@ -329,16 +334,18 @@
         </div>
     </div>
 
-    <!-- Calendario -->
+    <!-- Calendario Hogar -->
     <div class="section">
         <div class="section-header">
             <h2>📅 Calendario</h2>
             <a href="{{ url_for('agregar_gasto', perfil=perfil_activo) }}" class="btn btn-sm btn-success">+ Gasto</a>
         </div>
+        <div class="month-nav">
+            <a href="?mes={{ mes_ant }}&anio={{ anio_ant }}" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:0.7em;">‹ {{ MESES_ES[mes_ant][:3] }}</a>
+            <span style="font-size:0.85em;font-weight:700;">{{ MESES_ES[mes_ver] }} {{ anio_ver }}</span>
+            <a href="?mes={{ mes_sig }}&anio={{ anio_sig }}" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:0.7em;">{{ MESES_ES[mes_sig][:3] }} ›</a>
+        </div>
         <div class="calendario">
-            <div class="month-nav">
-                <span class="mes-label">{{ mes_actual }}</span>
-            </div>
             <div class="cal-grid">
                 {% for dn in dias_semana %}<div class="cal-dia-nombre">{{ dn }}</div>{% endfor %}
                 {% for d in range(dias_mes[0].dia - 1) %}<div class="cal-vacio"></div>{% endfor %}

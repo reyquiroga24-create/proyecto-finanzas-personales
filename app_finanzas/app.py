@@ -110,11 +110,35 @@ def index(perfil='personal'):
 
     conn = get_db()
     hoy = date.today()
-    mes_actual_str = f"{hoy.year}-{hoy.month:02d}"
+
+    # Navegacion entre meses
+    try:
+        mes_ver = int(request.args.get('mes', hoy.month))
+        anio_ver = int(request.args.get('anio', hoy.year))
+    except:
+        mes_ver = hoy.month
+        anio_ver = hoy.year
+
+    # Validar limites
+    if mes_ver < 1: mes_ver, anio_ver = 12, anio_ver - 1
+    if mes_ver > 12: mes_ver, anio_ver = 1, anio_ver + 1
+    if anio_ver < 2020: anio_ver, mes_ver = 2020, 1
+
+    mes_actual_str = f"{anio_ver}-{mes_ver:02d}"
     # Numero de semana actual
     semana_actual = hoy.isocalendar()[1]
     anio_actual = hoy.year
     semana_key = f"{anio_actual}-S{semana_actual:02d}"
+
+    # Calcular mes anterior y siguiente para navegacion
+    if mes_ver == 1:
+        mes_ant, anio_ant = 12, anio_ver - 1
+    else:
+        mes_ant, anio_ant = mes_ver - 1, anio_ver
+    if mes_ver == 12:
+        mes_sig, anio_sig = 1, anio_ver + 1
+    else:
+        mes_sig, anio_sig = mes_ver + 1, anio_ver
 
     # Datos comunes
     ingresos = conn.execute('SELECT * FROM ingresos ORDER BY fecha DESC').fetchall()
@@ -162,11 +186,11 @@ def index(perfil='personal'):
         # Calendario del mes
         dias_mes = []
         semanas_mes = []  # [{semana: N, dias: [{dia, pagos, monto_total}], total: X}]
-        ultimo = (date(hoy.year, hoy.month + 1, 1) - timedelta(days=1)).day if hoy.month < 12 else 31
+        ultimo = (date(anio_ver, mes_ver + 1, 1) - timedelta(days=1)).day if mes_ver < 12 else 31
         semana_actual_cal = 1
         semana_dias = []
         for d in range(1, ultimo + 1):
-            fecha_d = date(hoy.year, hoy.month, d)
+            fecha_d = date(anio_ver, mes_ver, d)
             pagos_dia = [p for p in pagos if p['dia_vencimiento'] == d]
             gastos_dia = conn.execute(
                 "SELECT COUNT(*), COALESCE(SUM(monto),0) FROM gastos WHERE perfil=? AND fecha=?",
@@ -216,7 +240,11 @@ def index(perfil='personal'):
             ahorros=ahorros,
             total_ahorrado_personal=total_ahorrado_personal,
             total_meta_personal=total_meta_personal,
-            es_resumen=False, date=date, semanas_mes=semanas_mes)
+            es_resumen=False, date=date, semanas_mes=semanas_mes,
+            mes_ver=mes_ver, anio_ver=anio_ver,
+            mes_ant=mes_ant, anio_ant=anio_ant,
+            mes_sig=mes_sig, anio_sig=anio_sig,
+            MESES_ES=MESES_ES)
 
     elif perfil == 'hogar':  # hogar - tiene calendario y pagos
         gastos = conn.execute('SELECT * FROM gastos WHERE perfil=? ORDER BY fecha DESC', (perfil,)).fetchall()
@@ -245,11 +273,11 @@ def index(perfil='personal'):
         # Calendario del mes
         dias_mes = []
         semanas_mes = []  # [{semana: N, dias: [{dia, pagos, abonos, total}], total: X}]
-        ultimo = (date(hoy.year, hoy.month + 1, 1) - timedelta(days=1)).day if hoy.month < 12 else 31
+        ultimo = (date(anio_ver, mes_ver + 1, 1) - timedelta(days=1)).day if mes_ver < 12 else 31
         semana_actual_cal = 1
         semana_dias = []
         for d in range(1, ultimo + 1):
-            fecha_d = date(hoy.year, hoy.month, d)
+            fecha_d = date(anio_ver, mes_ver, d)
             pagos_dia = [p for p in pagos if p['dia_vencimiento'] == d]
             # Abonos de planes de pago para este dia (todos, pagados y no pagados)
             abonos_hoy = conn.execute(
@@ -298,7 +326,11 @@ def index(perfil='personal'):
             presupuesto_semanal=presupuesto, gasto_semanal=gasto_semana,
             saldo_semanal=presupuesto - gasto_semana if perfil == 'personal' else 0,
             semana_label=f"Semana {semana_actual}" if perfil == 'personal' else '',
-            es_resumen=False, semanas_mes=semanas_mes)
+            es_resumen=False, semanas_mes=semanas_mes,
+            mes_ver=mes_ver, anio_ver=anio_ver,
+            mes_ant=mes_ant, anio_ant=anio_ant,
+            mes_sig=mes_sig, anio_sig=anio_sig,
+            MESES_ES=MESES_ES)
 
     else:  # resumen
         # Gastos totales
