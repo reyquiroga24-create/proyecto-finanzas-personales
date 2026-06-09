@@ -59,6 +59,7 @@
             </div>
         </div>
 
+        <!-- Grafico -->
         {% if gastos_categoria %}
         <div class="grafico-card" style="margin-bottom:14px;">
             <h3>Gastos del Mes por Categoría</h3>
@@ -75,15 +76,93 @@
         </div>
         {% endif %}
 
+        <!-- Toolbar -->
         <div class="toolbar">
             <a href="{{ url_for('agregar_gasto', perfil='personal') }}" class="btn">+ Nuevo Gasto</a>
             <a href="{{ url_for('exportar', perfil='personal') }}" class="btn btn-secondary btn-sm" style="margin-left:auto;">📥 CSV</a>
         </div>
 
+        <!-- CALENDARIO DE PAGOS FIJOS -->
         <div class="section">
             <div class="section-header">
                 <span class="section-badge ingresos"></span>
-                <h2>Gastos Personales</h2>
+                <h2>📅 Gastos Fijos</h2>
+                <button class="btn btn-sm" onclick="document.getElementById('pagoModal').classList.toggle('show')">+ Pago Fijo</button>
+            </div>
+
+            <div id="pagoModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Agregar Gasto Fijo</h3>
+                        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('pagoModal').classList.remove('show')">✕</button>
+                    </div>
+                    <form action="{{ url_for('agregar_pago', perfil=perfil_activo) }}" method="POST">
+                        <label>Nombre</label>
+                        <input type="text" name="nombre" placeholder="Ej: Netflix" required>
+                        <label>Monto ($)</label>
+                        <input type="number" name="monto" step="0.01" required>
+                        <label>Día de vencimiento</label>
+                        <input type="number" name="dia_vencimiento" min="1" max="31" placeholder="15" required>
+                        <label>Recurrencia</label>
+                        <select name="recurrencia">
+                            <option value="Mensual">Mensual</option>
+                            <option value="Bimestral">Bimestral</option>
+                            <option value="Trimestral">Trimestral</option>
+                            <option value="Anual">Anual</option>
+                        </select>
+                        <button type="submit">Guardar</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Calendario -->
+            <div class="calendario">
+                <div class="cal-header"><span></span><strong>{{ mes_actual }}</strong><span></span></div>
+                <div class="cal-grid">
+                    {% for d in dias_semana %}<div class="cal-dia-nombre">{{ d }}</div>{% endfor %}
+                    {% for d in range(dias_mes[0].dia - 1) %}<div class="cal-dia cal-vacio"></div>{% endfor %}
+                    {% for dia in dias_mes %}
+                    <div class="cal-dia {% if dia.hoy %}cal-hoy{% endif %} {% if dia.pagos %}cal-tiene-pago{% endif %} {% if dia.tiene_gastos %}cal-tiene-gasto{% endif %}">
+                        <span class="cal-numero">{{ dia.dia }}</span>
+                        {% if dia.pagos %}
+                        <div class="cal-pagos">
+                            {% for p in dia.pagos %}
+                            <div class="cal-pago-item" title="{{ p.nombre }}: ${{ '%.2f'|format(p.monto) }}">
+                                <span>{{ p.nombre[:6] }}</span>
+                                <span>${{ "%.0f"|format(p.monto) }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if pagos %}
+            <div style="margin-top:12px;">
+                <h3 style="font-size:0.85em;color:var(--text-secondary);margin-bottom:8px;">Gastos Fijos Programados</h3>
+                {% for p in pagos %}
+                <div class="pago-row">
+                    <div class="pago-info">
+                        <span class="pago-nombre">{{ p.nombre }}</span>
+                        <span class="pago-dia">Día {{ p.dia_vencimiento }}</span>
+                    </div>
+                    <span class="card-value-negative">${{ "%.2f"|format(p.monto) }}</span>
+                    <form action="{{ url_for('eliminar_pago', perfil='personal', id=p.id) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar {{ p.nombre }}?')">✕</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Lista de gastos -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-badge ingresos"></span>
+                <h2>Todos mis Gastos</h2>
                 <input type="text" class="filtro-input" style="max-width:130px;font-size:0.75em;padding:5px 8px;" placeholder="🔍" oninput="filtrar(this)">
             </div>
             {% if gastos %}

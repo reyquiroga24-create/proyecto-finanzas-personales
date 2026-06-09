@@ -140,6 +140,27 @@ def index(perfil='personal'):
             "SELECT COALESCE(SUM(monto),0) FROM gastos WHERE perfil=? AND fecha>=? AND fecha<=?",
             ('personal', lun.isoformat(), dom.isoformat())).fetchone()[0]
 
+        # Pagos programados (recurrentes) - TAMBIEN EN PERSONAL
+        pagos = conn.execute(
+            'SELECT * FROM pagos_programados WHERE perfil=? AND activo=1 ORDER BY dia_vencimiento',
+            (perfil,)).fetchall()
+
+        # Calendario del mes
+        dias_mes = []
+        ultimo = (date(hoy.year, hoy.month + 1, 1) - timedelta(days=1)).day if hoy.month < 12 else 31
+        for d in range(1, ultimo + 1):
+            fecha_d = date(hoy.year, hoy.month, d)
+            pagos_dia = [p for p in pagos if p['dia_vencimiento'] == d]
+            gastos_dia = conn.execute(
+                "SELECT COUNT(*), COALESCE(SUM(monto),0) FROM gastos WHERE perfil=? AND fecha=?",
+                (perfil, fecha_d.isoformat())).fetchone()
+            dias_mes.append({
+                'dia': d, 'hoy': fecha_d == hoy,
+                'pagos': [dict(p) for p in pagos_dia],
+                'tiene_gastos': gastos_dia[0] > 0,
+                'total_gastos': gastos_dia[1],
+            })
+
         conn.close()
         return render_template('index.html',
             perfiles=PERFILES, perfil_activo=perfil,
@@ -151,10 +172,13 @@ def index(perfil='personal'):
             presupuesto_semanal=presupuesto, gasto_semanal=gasto_semana,
             saldo_semanal=presupuesto - gasto_semana,
             semana_label=f"Semana {semana_actual}",
+            pagos=pagos, dias_mes=dias_mes, presupuesto_recibido=0,
             mes_actual=f"{MESES_ES[hoy.month]} {hoy.year}",
+            mes_num=hoy.month, anio=hoy.year,
+            dias_semana=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'],
             es_resumen=False)
 
-    elif perfil == 'hogar':
+    elif perfil == 'hogar':  # hogar - tiene calendario y pagos
         gastos = conn.execute('SELECT * FROM gastos WHERE perfil=? ORDER BY fecha DESC', (perfil,)).fetchall()
         total_mes = conn.execute(
             "SELECT COALESCE(SUM(monto),0) FROM gastos WHERE perfil=? AND strftime('%Y-%m',fecha)=?",
@@ -164,15 +188,19 @@ def index(perfil='personal'):
             "SELECT categoria, SUM(monto) as total FROM gastos WHERE perfil=? AND strftime('%Y-%m',fecha)=? GROUP BY categoria ORDER BY total DESC",
             (perfil, mes_actual_str)).fetchall()
 
-        # Pagos programados (recurrentes)
+        # Pagos programados (recurrentes) - para ambos perfiles
         pagos = conn.execute(
             'SELECT * FROM pagos_programados WHERE perfil=? AND activo=1 ORDER BY dia_vencimiento',
             (perfil,)).fetchall()
 
-        # Presupuesto del hogar (pago que reciben)
-        presupuesto = conn.execute(
-            "SELECT COALESCE(SUM(monto),0) FROM presupuestos WHERE perfil=? AND semana=?",
-            ('hogar', semana_key)).fetchone()[0]
+        # Presupuesto recibido (solo hogar) o presupuesto semanal (personal)
+        presupuesto = 0
+        gasto_semana = 0
+        presupuesto_recibido = 0
+        if perfil == 'hogar':
+            presupuesto_recibido = conn.execute(
+                "SELECT COALESCE(SUM(monto),0) FROM presupuestos WHERE perfil=? AND semana=?",
+                ('hogar', semana_key)).fetchone()[0]
 
         # Calendario del mes
         dias_mes = []
@@ -200,10 +228,13 @@ def index(perfil='personal'):
             gastos_categoria=gastos_categoria,
             categorias=CATEGORIAS.get(perfil, {}),
             pagos=pagos, dias_mes=dias_mes,
-            presupuesto_recibido=presupuesto,
+            presupuesto_recibido=presupuesto_recibido,
             mes_actual=f"{MESES_ES[hoy.month]} {hoy.year}",
             mes_num=hoy.month, anio=hoy.year,
             dias_semana=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'],
+            presupuesto_semanal=presupuesto, gasto_semanal=gasto_semana,
+            saldo_semanal=presupuesto - gasto_semana if perfil == 'personal' else 0,
+            semana_label=f"Semana {semana_actual}" if perfil == 'personal' else '',
             es_resumen=False)
 
     else:  # resumen
