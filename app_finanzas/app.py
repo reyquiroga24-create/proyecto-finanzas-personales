@@ -161,13 +161,31 @@ def index(perfil='personal'):
 
         # Calendario del mes
         dias_mes = []
+        semanas_mes = []  # [{semana: N, dias: [{dia, pagos, monto_total}], total: X}]
         ultimo = (date(hoy.year, hoy.month + 1, 1) - timedelta(days=1)).day if hoy.month < 12 else 31
+        semana_actual_cal = 1
+        semana_dias = []
         for d in range(1, ultimo + 1):
             fecha_d = date(hoy.year, hoy.month, d)
             pagos_dia = [p for p in pagos if p['dia_vencimiento'] == d]
             gastos_dia = conn.execute(
                 "SELECT COUNT(*), COALESCE(SUM(monto),0) FROM gastos WHERE perfil=? AND fecha=?",
                 (perfil, fecha_d.isoformat())).fetchone()
+            # Agrupar por semana (Lun-Dom)
+            dia_semana_pago = fecha_d.weekday()
+            total_dia = sum(p['monto'] for p in pagos_dia) + gastos_dia[1]
+            dia_info = {'dia': d, 'pagos': [dict(p) for p in pagos_dia], 'total': total_dia}
+            semana_dias.append(dia_info)
+            if dia_semana_pago == 6 or d == ultimo:  # Domingo o ultimo dia
+                total_semana = sum(sd['total'] for sd in semana_dias)
+                semanas_mes.append({
+                    'semana': semana_actual_cal,
+                    'dias': semana_dias,
+                    'total': total_semana
+                })
+                semana_actual_cal += 1
+                semana_dias = []
+
             dias_mes.append({
                 'dia': d, 'hoy': fecha_d == hoy,
                 'pagos': [dict(p) for p in pagos_dia],
@@ -198,7 +216,7 @@ def index(perfil='personal'):
             ahorros=ahorros,
             total_ahorrado_personal=total_ahorrado_personal,
             total_meta_personal=total_meta_personal,
-            es_resumen=False, date=date)
+            es_resumen=False, date=date, semanas_mes=semanas_mes)
 
     elif perfil == 'hogar':  # hogar - tiene calendario y pagos
         gastos = conn.execute('SELECT * FROM gastos WHERE perfil=? ORDER BY fecha DESC', (perfil,)).fetchall()
@@ -226,17 +244,30 @@ def index(perfil='personal'):
 
         # Calendario del mes
         dias_mes = []
+        semanas_mes = []  # [{semana: N, dias: [{dia, pagos, abonos, total}], total: X}]
         ultimo = (date(hoy.year, hoy.month + 1, 1) - timedelta(days=1)).day if hoy.month < 12 else 31
+        semana_actual_cal = 1
+        semana_dias = []
         for d in range(1, ultimo + 1):
             fecha_d = date(hoy.year, hoy.month, d)
             pagos_dia = [p for p in pagos if p['dia_vencimiento'] == d]
-            # Abonos de planes de pago para este dia
+            # Abonos de planes de pago para este dia (todos, pagados y no pagados)
             abonos_hoy = conn.execute(
-                "SELECT a.*, p.nombre as plan_nombre FROM abonos_pago a JOIN planes_pago p ON a.plan_id=p.id WHERE a.fecha=? AND a.pagado=0 AND p.perfil=?",
+                "SELECT a.*, p.nombre as plan_nombre FROM abonos_pago a JOIN planes_pago p ON a.plan_id=p.id WHERE a.fecha=? AND p.perfil=?",
                 (fecha_d.isoformat(), perfil)).fetchall()
             gastos_dia = conn.execute(
                 "SELECT COUNT(*), COALESCE(SUM(monto),0) FROM gastos WHERE perfil=? AND fecha=?",
                 (perfil, fecha_d.isoformat())).fetchone()
+            # Agrupar por semana
+            total_dia = sum(p['monto'] for p in pagos_dia) + sum(a['monto'] for a in abonos_hoy) + gastos_dia[1]
+            dia_info = {'dia': d, 'pagos': [dict(p) for p in pagos_dia], 'abonos': [dict(a) for a in abonos_hoy], 'total': total_dia}
+            semana_dias.append(dia_info)
+            if fecha_d.weekday() == 6 or d == ultimo:
+                total_semana = sum(sd['total'] for sd in semana_dias)
+                semanas_mes.append({'semana': semana_actual_cal, 'dias': semana_dias, 'total': total_semana})
+                semana_actual_cal += 1
+                semana_dias = []
+
             dias_mes.append({
                 'dia': d,
                 'hoy': fecha_d == hoy,
@@ -267,7 +298,7 @@ def index(perfil='personal'):
             presupuesto_semanal=presupuesto, gasto_semanal=gasto_semana,
             saldo_semanal=presupuesto - gasto_semana if perfil == 'personal' else 0,
             semana_label=f"Semana {semana_actual}" if perfil == 'personal' else '',
-            es_resumen=False)
+            es_resumen=False, semanas_mes=semanas_mes)
 
     else:  # resumen
         # Gastos totales

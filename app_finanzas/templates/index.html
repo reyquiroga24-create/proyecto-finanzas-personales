@@ -104,7 +104,11 @@
                 {% for dn in dias_semana %}<div class="cal-dia-nombre">{{ dn }}</div>{% endfor %}
                 {% for d in range(dias_mes[0].dia - 1) %}<div class="cal-vacio"></div>{% endfor %}
                 {% for d in dias_mes %}
-                <div class="cal-dia {% if d.hoy %}cal-hoy{% endif %} {% if d.pagos %}cal-tiene-pago{% endif %}">
+                <div class="cal-dia {% if d.hoy %}cal-hoy{% endif %} {% if d.pagos %}cal-tiene-pago{% endif %}"
+                     data-dia="{{ d.dia }}"
+                     data-pagos='[{% for p in d.pagos %}{"nombre":"{{ p.nombre }}","monto":{{ p.monto }},"cat":"{{ p.categoria if p.categoria is defined else 'Servicio' }}"}{% if not loop.last %},{% endif %}{% endfor %}]'
+                     data-total="{{ d.total_gastos }}"
+                     data-hay-gastos="{{ d.tiene_gastos|lower }}">
                     <div class="cal-numero">{{ d.dia }}</div>
                     <div class="cal-pagos">
                         {% for p in d.pagos %}
@@ -119,6 +123,37 @@
             </div>
         </div>
     </div>
+
+    <!-- Resumen semanal (Personal) -->
+    {% if semanas_mes %}
+    <div class="section" style="margin-top:-8px;">
+        <div class="section-header">
+            <h2 style="font-size:0.85em;">📆 Pagos de la Semana</h2>
+        </div>
+        {% for sm in semanas_mes %}
+        {% if sm.total > 0 %}
+        <div style="margin-bottom:8px;padding:8px 10px;background:var(--card-bg);border-radius:8px;border:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <strong style="font-size:0.78em;color:var(--text-secondary);">Semana {{ sm.semana }}</strong>
+                <strong style="font-size:0.9em;color:var(--red);">${{ "%.2f"|format(sm.total) }}</strong>
+            </div>
+            {% for sd in sm.dias %}
+            {% if sd.total > 0 %}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:0.75em;">
+                <span style="color:var(--text-secondary);">Día {{ sd.dia }}</span>
+                <span style="font-weight:600;">
+                    {% for p in sd.pagos %}
+                    <span style="color:var(--red);">{{ p.nombre[:6] }} ${{ '%.0f'|format(p.monto) }}{% if not loop.last %}, {% endif %}</span>
+                    {% endfor %}
+                </span>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- Ahorros -->
     <div class="section">
@@ -308,7 +343,12 @@
                 {% for dn in dias_semana %}<div class="cal-dia-nombre">{{ dn }}</div>{% endfor %}
                 {% for d in range(dias_mes[0].dia - 1) %}<div class="cal-vacio"></div>{% endfor %}
                 {% for d in dias_mes %}
-                <div class="cal-dia {% if d.hoy %}cal-hoy{% endif %} {% if d.pagos %}cal-tiene-pago{% endif %}">
+                <div class="cal-dia {% if d.hoy %}cal-hoy{% endif %} {% if d.pagos %}cal-tiene-pago{% endif %}"
+                     data-dia="{{ d.dia }}"
+                     data-pagos='[{% for p in d.pagos %}{"nombre":"{{ p.nombre }}","monto":{{ p.monto }},"cat":"Pago Recurrente"}{% if not loop.last %},{% endif %}{% endfor %}]'
+                     data-abonos='[{% for a in d.abonos %}{"nombre":"{{ a.plan_nombre }}","monto":{{ a.monto }},"pagado":{{ a.pagado|lower }}}{% if not loop.last %},{% endif %}{% endfor %}]'
+                     data-total="{{ d.total_gastos }}"
+                     data-hay-gastos="{{ d.tiene_gastos|lower }}">
                     <div class="cal-numero">{{ d.dia }}</div>
                     <div class="cal-pagos">
                         {% for p in d.pagos %}
@@ -336,6 +376,40 @@
             </div>
         </div>
     </div>
+
+    <!-- Resumen semanal (Hogar) -->
+    {% if semanas_mes %}
+    <div class="section" style="margin-top:-8px;">
+        <div class="section-header">
+            <h2 style="font-size:0.85em;">📆 Resumen de la Semana</h2>
+        </div>
+        {% for sm in semanas_mes %}
+        {% if sm.total > 0 %}
+        <div style="margin-bottom:8px;padding:8px 10px;background:var(--card-bg);border-radius:8px;border:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <strong style="font-size:0.78em;color:var(--text-secondary);">Semana {{ sm.semana }}</strong>
+                <strong style="font-size:0.9em;color:var(--orange);">${{ "%.2f"|format(sm.total) }}</strong>
+            </div>
+            {% for sd in sm.dias %}
+            {% if sd.total > 0 %}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:0.75em;">
+                <span style="color:var(--text-secondary);">Día {{ sd.dia }}</span>
+                <span>
+                    {% for p in sd.pagos %}
+                    <span class="badge badge-red" style="font-size:0.7em;">{{ p.nombre[:6] }} ${{ '%.0f'|format(p.monto) }}</span>
+                    {% endfor %}
+                    {% for a in sd.abonos %}
+                    <span class="badge {% if a.pagado %}badge-green{% else %}badge-orange{% endif %}" style="font-size:0.7em;">{{ a.plan_nombre[:6] }} ${{ '%.0f'|format(a.monto) }}</span>
+                    {% endfor %}
+                </span>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- PAGOS PROGRAMADOS -->
     {% if pagos %}
@@ -831,6 +905,17 @@
                 </div>
                 <button type="submit" class="btn" style="width:100%;">💾 Guardar Gasto Rápido</button>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALLE DEL DÍA -->
+    <div class="modal" id="diaModal">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h3 id="diaModalTitle">Día</h3>
+                <button class="btn btn-sm btn-secondary" onclick="document.getElementById('diaModal').classList.remove('show')">✕</button>
+            </div>
+            <div id="diaModalBody"></div>
         </div>
     </div>
 
