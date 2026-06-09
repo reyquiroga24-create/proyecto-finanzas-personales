@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Ahorro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">
+            <a href="{{ url_for('index', perfil='personal') }}" class="btn btn-secondary btn-sm">← Volver</a>
+            <h1 style="font-size:1em;">Editar Ahorro</h1>
+            <div></div>
+        </div>
+        <form method="POST">
+            <label for="nombre">¿Para qué es?</label>
+            <input type="text" id="nombre" name="nombre" value="{{ ahorro.nombre }}" required>
+
+            <label for="monto_objetivo">Meta ($)</label>
+            <input type="number" id="monto_objetivo" name="monto_objetivo" step="0.01" value="{{ ahorro.monto_objetivo }}" required>
+
+            <label for="monto_actual">Llevas ahorrado ($)</label>
+            <input type="number" id="monto_actual" name="monto_actual" step="0.01" value="{{ ahorro.monto_actual }}">
+
+            <button type="submit">Actualizar</button>
+        </form>
+    </div>
+</body>
+</html>

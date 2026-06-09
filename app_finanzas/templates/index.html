@@ -158,6 +158,79 @@
             {% endif %}
         </div>
 
+        <!-- AHORROS PERSONALES -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-badge metas"></span>
+                <h2>🎯 Mis Ahorros</h2>
+            </div>
+
+            <!-- Resumen ahorros -->
+            <div class="dashboard-grid" style="margin-bottom:10px;">
+                <div class="dash-card dash-ingresos">
+                    <div class="dash-label">Total Ahorrado</div>
+                    <div class="dash-value">${{ "%.2f"|format(total_ahorrado_personal) }}</div>
+                </div>
+                <div class="dash-card dash-totals">
+                    <div class="dash-label">Meta Total</div>
+                    <div class="dash-value-sm">${{ "%.2f"|format(total_meta_personal) }}</div>
+                </div>
+            </div>
+
+            <!-- Formulario para nuevo ahorro -->
+            <form action="{{ url_for('agregar_ahorro') }}" method="POST" style="display:flex;gap:6px;padding:0;border:none;box-shadow:none;background:none;margin-bottom:10px;flex-wrap:wrap;">
+                <input type="text" name="nombre" placeholder="¿Para qué? Ej: Viaje" style="flex:1;min-width:100px;padding:7px 10px;border:1px solid var(--input-border);border-radius:6px;font-size:0.82em;background:var(--input-bg);color:var(--text);">
+                <input type="number" name="monto_objetivo" step="0.01" placeholder="$ Meta" style="width:90px;padding:7px 10px;border:1px solid var(--input-border);border-radius:6px;font-size:0.82em;background:var(--input-bg);color:var(--text);">
+                <button type="submit" class="btn">+ Crear</button>
+            </form>
+
+            {% if ahorros %}
+            <div class="card-list">
+                {% for item in ahorros %}
+                {% set progreso = (item.monto_actual / item.monto_objetivo * 100)|round if item.monto_objetivo > 0 else 0 %}
+                <div class="card-item">
+                    <div class="card-row">
+                        <span class="card-label">Para</span>
+                        <span class="card-value" style="font-weight:700;">{{ item.nombre }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Meta</span>
+                        <span class="card-value card-value-positive">${{ "%.2f"|format(item.monto_objetivo) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Ahorrado</span>
+                        <span class="card-value">${{ "%.2f"|format(item.monto_actual) }}</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Progreso</span>
+                        <span class="card-value">
+                            <div class="progress-bar"><div class="progress-fill" style="width:{{ progreso }}%;"></div></div>
+                            <small>{{ progreso|int }}%</small>
+                        </span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Actualizar</span>
+                        <span class="card-value">
+                            <form action="{{ url_for('actualizar_ahorro', id=item.id) }}" method="POST" style="display:flex;gap:4px;padding:0;border:none;box-shadow:none;background:none;margin:0;align-items:center;">
+                                <input type="number" name="monto_actual" step="0.01" placeholder="$" value="{{ item.monto_actual }}" style="width:80px;padding:4px 6px;border:1px solid var(--input-border);border-radius:4px;font-size:0.78em;background:var(--input-bg);color:var(--text);">
+                                <button type="submit" class="btn btn-sm" style="padding:4px 8px;font-size:0.72em;">Actualizar</button>
+                            </form>
+                        </span>
+                    </div>
+                    <div class="card-actions">
+                        <a href="{{ url_for('editar_ahorro', id=item.id) }}" class="btn btn-sm">Editar</a>
+                        <form action="{{ url_for('eliminar_ahorro', id=item.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Eliminar {{ item.nombre }}?')">Eliminar</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-msg">No tienes metas de ahorro aún. ¡Crea una!</p>
+            {% endif %}
+        </div>
+
         <!-- Lista de gastos -->
         <div class="section">
             <div class="section-header">

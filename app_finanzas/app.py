@@ -81,6 +81,11 @@ def init_db():
         nombre TEXT NOT NULL, monto REAL NOT NULL, categoria TEXT NOT NULL DEFAULT 'Servicio',
         dia_vencimiento INTEGER NOT NULL, recurrencia TEXT DEFAULT 'Mensual',
         activo INTEGER DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS ahorros_personales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL, monto_objetivo REAL NOT NULL,
+        monto_actual REAL DEFAULT 0.0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
     # Migrar columna perfil si no existe
     try:
         c.execute('ALTER TABLE gastos ADD COLUMN perfil TEXT NOT NULL DEFAULT "personal"')
@@ -161,6 +166,11 @@ def index(perfil='personal'):
                 'total_gastos': gastos_dia[1],
             })
 
+        # Ahorros personales
+        ahorros = conn.execute('SELECT * FROM ahorros_personales ORDER BY nombre').fetchall()
+        total_ahorrado_personal = conn.execute("SELECT COALESCE(SUM(monto_actual),0) FROM ahorros_personales").fetchone()[0]
+        total_meta_personal = conn.execute("SELECT COALESCE(SUM(monto_objetivo),0) FROM ahorros_personales").fetchone()[0]
+
         conn.close()
         return render_template('index.html',
             perfiles=PERFILES, perfil_activo=perfil,
@@ -176,6 +186,9 @@ def index(perfil='personal'):
             mes_actual=f"{MESES_ES[hoy.month]} {hoy.year}",
             mes_num=hoy.month, anio=hoy.year,
             dias_semana=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'],
+            ahorros=ahorros,
+            total_ahorrado_personal=total_ahorrado_personal,
+            total_meta_personal=total_meta_personal,
             es_resumen=False)
 
     elif perfil == 'hogar':  # hogar - tiene calendario y pagos
@@ -520,6 +533,50 @@ def exportar(perfil):
     mem = io.BytesIO(out.getvalue().encode('utf-8'))
     mem.seek(0)
     return send_file(mem, mimetype='text/csv', as_attachment=True, download_name=f'finanzas_{perfil}_{date.today().isoformat()}.csv')
+
+# ---- CRUD Ahorros Personales ----
+@app.route('/agregar_ahorro', methods=('POST',))
+def agregar_ahorro():
+    nombre = request.form.get('nombre')
+    monto = request.form.get('monto_objetivo')
+    if nombre and monto:
+        conn = get_db()
+        conn.execute('INSERT INTO ahorros_personales (nombre, monto_objetivo) VALUES (?,?)', (nombre, float(monto)))
+        conn.commit(); conn.close()
+        flash('Meta de ahorro agregada!', 'success')
+    return redirect(url_for('index', perfil='personal'))
+
+@app.route('/actualizar_ahorro/<int:id>', methods=('POST',))
+def actualizar_ahorro(id):
+    monto = request.form.get('monto_actual')
+    if monto:
+        conn = get_db()
+        conn.execute('UPDATE ahorros_personales SET monto_actual = ? WHERE id = ?', (float(monto), id))
+        conn.commit(); conn.close()
+        flash('Ahorro actualizado!', 'success')
+    return redirect(url_for('index', perfil='personal'))
+
+@app.route('/editar_ahorro/<int:id>', methods=('GET', 'POST'))
+def editar_ahorro(id):
+    conn = get_db()
+    ahorro = conn.execute('SELECT * FROM ahorros_personales WHERE id=?', (id,)).fetchone()
+    if request.method == 'POST':
+        n, mo, ma = request.form.get('nombre'), request.form.get('monto_objetivo'), request.form.get('monto_actual')
+        if n and mo:
+            conn.execute('UPDATE ahorros_personales SET nombre=?, monto_objetivo=?, monto_actual=? WHERE id=?', (n, float(mo), float(ma or 0), id))
+            conn.commit(); conn.close()
+            flash('Ahorro actualizado!', 'success')
+            return redirect(url_for('index', perfil='personal'))
+    conn.close()
+    return render_template('editar_ahorro.html', ahorro=ahorro)
+
+@app.route('/eliminar_ahorro/<int:id>', methods=('POST',))
+def eliminar_ahorro(id):
+    conn = get_db()
+    conn.execute('DELETE FROM ahorros_personales WHERE id=?', (id,))
+    conn.commit(); conn.close()
+    flash('Meta eliminada!', 'success')
+    return redirect(url_for('index', perfil='personal'))
 
 if __name__ == '__main__':
     init_db()
