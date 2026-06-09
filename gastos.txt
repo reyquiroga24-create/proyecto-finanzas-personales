@@ -1,0 +1,10 @@
+Verizon: 250.00, Mensual
+Internet: 113.80, Mensual
+Agua: 100.00, Mensual
+Seguro de auto: 180.00, Mensual
+Carro: 467.00, Mensual
+Luz: 422.00, Mensual
+Luz_adicional: 18.00, Mensual
+Casa_mensual: 2125.67, Mensual
+Casa_contribucion: 600.00, Semanal
+Personal: 200.00, Semanal

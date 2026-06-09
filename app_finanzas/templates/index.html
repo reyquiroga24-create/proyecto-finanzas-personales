@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanzas Personales</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Mis Finanzas Personales</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="section">
+            <h2>Ingresos</h2>
+            <a href="{{ url_for('agregar_ingreso') }}" class="btn">Agregar Ingreso</a>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Monto</th>
+                        <th>Descripción</th>
+                        <th>Fecha</th>
+                        <th>Recurrencia</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ingreso in ingresos %}
+                    <tr>
+                        <td>{{ "%.2f"|format(ingreso.monto) }}</td>
+                        <td>{{ ingreso.descripcion }}</td>
+                        <td>{{ ingreso.fecha }}</td>
+                        <td>{{ ingreso.recurrencia if ingreso.recurrencia else 'N/A' }}</td>
+                        <td>
+                            <a href="{{ url_for('editar_ingreso', id=ingreso.id) }}" class="btn btn-sm">Editar</a>
+                            <form action="{{ url_for('eliminar_ingreso', id=ingreso.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Gastos</h2>
+            <a href="{{ url_for('agregar_gasto') }}" class="btn">Agregar Gasto</a>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Monto</th>
+                        <th>Descripción</th>
+                        <th>Categoría</th>
+                        <th>Fecha</th>
+                        <th>Recurrencia</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gasto in gastos %}
+                    <tr>
+                        <td>{{ "%.2f"|format(gasto.monto) }}</td>
+                        <td>{{ gasto.descripcion }}</td>
+                        <td>{{ gasto.categoria }}</td>
+                        <td>{{ gasto.fecha }}</td>
+                        <td>{{ gasto.recurrencia if gasto.recurrencia else 'N/A' }}</td>
+                        <td>
+                            <a href="{{ url_for('editar_gasto', id=gasto.id) }}" class="btn btn-sm">Editar</a>
+                            <form action="{{ url_for('eliminar_gasto', id=gasto.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Metas de Ahorro</h2>
+            <a href="{{ url_for('agregar_meta') }}" class="btn">Agregar Meta</a>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Monto Objetivo</th>
+                        <th>Monto Actual</th>
+                        <th>Fecha Límite</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for meta in metas %}
+                    <tr>
+                        <td>{{ meta.nombre }}</td>
+                        <td>{{ "%.2f"|format(meta.monto_objetivo) }}</td>
+                        <td>{{ "%.2f"|format(meta.monto_actual) }}</td>
+                        <td>{{ meta.fecha_limite }}</td>
+                        <td>
+                            <a href="{{ url_for('editar_meta', id=meta.id) }}" class="btn btn-sm">Editar</a>
+                            <form action="{{ url_for('eliminar_meta', id=meta.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Deudas</h2>
+            <a href="{{ url_for('agregar_deuda') }}" class="btn">Agregar Deuda</a>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Monto Total</th>
+                        <th>Monto Pagado</th>
+                        <th>Fecha Inicio</th>
+                        <th>Fecha Fin Estimada</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for deuda in deudas %}
+                    <tr>
+                        <td>{{ deuda.nombre }}</td>
+                        <td>{{ "%.2f"|format(deuda.monto_total) }}</td>
+                        <td>{{ "%.2f"|format(deuda.monto_pagado) }}</td>
+                        <td>{{ deuda.fecha_inicio }}</td>
+                        <td>{{ deuda.fecha_fin_estimada if deuda.fecha_fin_estimada else 'N/A' }}</td>
+                        <td>
+                            <a href="{{ url_for('editar_deuda', id=deuda.id) }}" class="btn btn-sm">Editar</a>
+                            <form action="{{ url_for('eliminar_deuda', id=deuda.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
