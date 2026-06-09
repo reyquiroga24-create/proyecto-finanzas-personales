@@ -95,6 +95,14 @@ def init_db():
         monto REAL NOT NULL, fecha TEXT NOT NULL,
         pagado INTEGER DEFAULT 0,
         FOREIGN KEY (plan_id) REFERENCES planes_pago(id))""")
+    c.execute("""CREATE TABLE IF NOT EXISTS fondo_semanal (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        semana TEXT NOT NULL UNIQUE,
+        ingreso REAL DEFAULT 0,
+        sobrante REAL DEFAULT 0,
+        acumulado_antes REAL DEFAULT 0,
+        apartado INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
     # Migrar columna perfil si no existe
     try:
         c.execute('ALTER TABLE gastos ADD COLUMN perfil TEXT NOT NULL DEFAULT "personal"')
@@ -270,6 +278,62 @@ def index(perfil='personal'):
                 "SELECT COALESCE(SUM(monto),0) FROM presupuestos WHERE perfil=? AND semana=?",
                 ('hogar', semana_key)).fetchone()[0]
 
+        # ===== FONDO SEMANAL (balance semanal) =====
+        fondo_info = None
+        if perfil == 'hogar':
+            # Calcular pagos de esta semana (recurrentes + abonos)
+            lun = hoy - timedelta(days=hoy.weekday())
+            dom = lun + timedelta(days=6)
+            # Pagos recurrentes en los dias de esta semana
+            pagos_semana = []
+            for d in range(lun.day, dom.day + 1):
+                if d < 1 or d > 31: continue
+                try:
+                    fd = date(hoy.year, hoy.month, d)
+                except:
+                    continue
+                for p in pagos:
+                    if p['dia_vencimiento'] == d:
+                        pagos_semana.append(p)
+            total_pagos_semana = sum(p['monto'] for p in pagos_semana)
+            # Abonos esta semana (no pagados)
+            abonos_semana = conn.execute(
+                "SELECT a.*, p.nombre as plan_nombre FROM abonos_pago a JOIN planes_pago p ON a.plan_id=p.id WHERE a.fecha>=? AND a.fecha<=? AND a.pagado=0 AND p.perfil=?",
+                (lun.isoformat(), dom.isoformat(), 'hogar')).fetchall()
+            total_abonos_semana = sum(a['monto'] for a in abonos_semana)
+            total_pendiente_semana = total_pagos_semana + total_abonos_semana
+
+            # Calcular sobrante
+            if presupuesto_recibido > 0:
+                sobrante = presupuesto_recibido - total_pendiente_semana
+            else:
+                sobrante = None
+
+            # Fondo acumulado (todas las semanas donde apartado=1)
+            total_acumulado = conn.execute(
+                "SELECT COALESCE(SUM(sobrante),0) FROM fondo_semanal WHERE apartado=1"
+            ).fetchone()[0]
+
+            # Esta semana ya se registro?
+            fondo_sem = conn.execute(
+                "SELECT * FROM fondo_semanal WHERE semana=?", (semana_key,)).fetchone()
+
+            fondos_historial = conn.execute(
+                "SELECT * FROM fondo_semanal ORDER BY semana DESC LIMIT 10"
+            ).fetchall()
+
+            fondo_info = {
+                'semana_key': semana_key,
+                'total_pagos_semana': total_pagos_semana,
+                'total_abonos_semana': total_abonos_semana,
+                'total_pendiente_semana': total_pendiente_semana,
+                'sobrante': sobrante,
+                'total_acumulado': total_acumulado,
+                'fondo_sem': dict(fondo_sem) if fondo_sem else None,
+                'fondos_historial': [dict(f) for f in fondos_historial],
+                'meta': 500,  # Meta por defecto, el usuario puede cambiarla
+            }
+
         # Calendario del mes
         dias_mes = []
         semanas_mes = []  # [{semana: N, dias: [{dia, pagos, abonos, total}], total: X}]
@@ -330,7 +394,7 @@ def index(perfil='personal'):
             mes_ver=mes_ver, anio_ver=anio_ver,
             mes_ant=mes_ant, anio_ant=anio_ant,
             mes_sig=mes_sig, anio_sig=anio_sig,
-            MESES_ES=MESES_ES)
+            MESES_ES=MESES_ES, fondo_info=fondo_info)
 
     else:  # resumen
         # Gastos totales
@@ -760,6 +824,68 @@ def api_recordatorios(perfil):
         except: pass
     conn.close()
     return jsonify(recordatorios)
+
+# ---- Fondo Semanal ----
+@app.route('/apartar_sobrante/<semana>', methods=('POST',))
+def apartar_sobrante(semana):
+    accion = request.form.get('accion', 'si')
+    conn = get_db()
+    if accion == 'si':
+        # Primero veo si ya existe registro para esta semana
+        existente = conn.execute("SELECT * FROM fondo_semanal WHERE semana=?", (semana,)).fetchone()
+        if not existente:
+            # Obtener el sobrante calculado
+            hoy = date.today()
+            semana_actual = hoy.isocalendar()[1]
+            anio_actual = hoy.year
+            semana_key = f"{anio_actual}-S{semana_actual:02d}"
+            if semana == semana_key:
+                lun = hoy - timedelta(days=hoy.weekday())
+                dom = lun + timedelta(days=6)
+                # Pagos de la semana
+                pagos_prog = conn.execute(
+                    'SELECT * FROM pagos_programados WHERE perfil="hogar" AND activo=1'
+                ).fetchall()
+                total_p = 0
+                for d in range(lun.day, dom.day + 1):
+                    for p in pagos_prog:
+                        if p['dia_vencimiento'] == d:
+                            total_p += p['monto']
+                abonos_sem = conn.execute(
+                    "SELECT COALESCE(SUM(a.monto),0) FROM abonos_pago a JOIN planes_pago p ON a.plan_id=p.id WHERE a.fecha>=? AND a.fecha<=? AND a.pagado=0 AND p.perfil='hogar'",
+                    (lun.isoformat(), dom.isoformat())).fetchone()[0]
+                total_pendiente = total_p + abonos_sem
+                presupuesto = conn.execute(
+                    "SELECT COALESCE(SUM(monto),0) FROM presupuestos WHERE perfil='hogar' AND semana=?",
+                    (semana_key,)).fetchone()[0]
+                sobrante = presupuesto - total_pendiente if presupuesto > 0 else 0
+                # Acumulado anterior
+                acum_antes = conn.execute(
+                    "SELECT COALESCE(SUM(sobrante),0) FROM fondo_semanal WHERE apartado=1"
+                ).fetchone()[0]
+                conn.execute(
+                    "INSERT INTO fondo_semanal (semana, ingreso, sobrante, acumulado_antes, apartado) VALUES (?,?,?,?,1)",
+                    (semana, presupuesto, sobrante if sobrante > 0 else 0, acum_antes))
+                flash(f'${sobrante:.2f} apartados al fondo! Total acumulado: ${acum_antes + (sobrante if sobrante > 0 else 0):.2f}', 'success')
+        else:
+            conn.execute("UPDATE fondo_semanal SET apartado=1 WHERE semana=?", (semana,))
+            flash('Sobrante apartado al fondo!', 'success')
+    else:
+        # No apartar, registrar la semana sin apartar
+        conn.execute(
+            "INSERT OR IGNORE INTO fondo_semanal (semana, ingreso, sobrante, apartado) VALUES (?,?,?,0)",
+            (semana, 0, 0, 0))
+        flash('Ok, no se apartó nada.', 'info')
+    conn.commit(); conn.close()
+    return redirect(url_for('index', perfil='hogar'))
+
+@app.route('/reiniciar_fondo', methods=('POST',))
+def reiniciar_fondo():
+    conn = get_db()
+    conn.execute("DELETE FROM fondo_semanal WHERE apartado=1")
+    conn.commit(); conn.close()
+    flash('Fondo reiniciado!', 'success')
+    return redirect(url_for('index', perfil='hogar'))
 
 if __name__ == '__main__':
     init_db()

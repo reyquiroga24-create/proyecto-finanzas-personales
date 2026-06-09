@@ -334,6 +334,94 @@
         </div>
     </div>
 
+    {% if fondo_info and perfil_activo == 'hogar' %}
+    <!-- BALANCE SEMANAL -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="gradient-text-green">📊 Balance de la Semana</h2>
+        </div>
+        <div class="dashboard-grid" style="margin-bottom:6px;">
+            <div class="dash-card dash-ingresos">
+                <div class="dash-label">Recibido</div>
+                <div class="dash-value" style="font-size:1em;">${{ "%.2f"|format(presupuesto_recibido) if presupuesto_recibido > 0 else '—' }}</div>
+            </div>
+            <div class="dash-card dash-gastos">
+                <div class="dash-label">Pagos Semana</div>
+                <div class="dash-value" style="font-size:1em;">${{ "%.2f"|format(fondo_info.total_pendiente_semana) }}</div>
+            </div>
+        </div>
+        {% if fondo_info.sobrante is not none %}
+        <div class="card-item" style="margin-bottom:8px;">
+            <div class="card-row">
+                <span class="card-label">Balance</span>
+                <span class="card-value" style="font-size:1.1em;font-weight:800;{% if fondo_info.sobrante >= 0 %}color:var(--green);{% else %}color:var(--red);{% endif %}">
+                    {% if fondo_info.sobrante >= 0 %}✅ Sobran{% else %}❌ Faltan{% endif %}
+                    ${{ "%.2f"|format(fondo_info.sobrante|abs) }}
+                </span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if fondo_info.fondo_sem and fondo_info.fondo_sem.apartado == 1 %}
+        <div style="text-align:center;padding:8px;background:var(--green-bg);border-radius:8px;margin-bottom:6px;">
+            <span class="badge badge-green">✅ Ya apartaste el sobrante de esta semana</span>
+        </div>
+        {% elif presupuesto_recibido > 0 and fondo_info.sobrante is not none and fondo_info.sobrante > 0 %}
+        <div style="text-align:center;padding:6px;font-size:0.8em;color:var(--text-secondary);margin-bottom:8px;">
+            💡 Sobraron <strong>${{ "%.2f"|format(fondo_info.sobrante) }}</strong> esta semana
+        </div>
+        <div style="display:flex;gap:6px;">
+            <form action="{{ url_for('apartar_sobrante', semana=fondo_info.semana_key) }}" method="POST" style="flex:1;margin:0;padding:0;border:none;box-shadow:none;background:none;">
+                <input type="hidden" name="accion" value="si">
+                <button type="submit" class="btn btn-sm btn-success" style="width:100%;padding:8px;">✅ Sí, apartar ${{ "%.0f"|format(fondo_info.sobrante) }}</button>
+            </form>
+            <form action="{{ url_for('apartar_sobrante', semana=fondo_info.semana_key) }}" method="POST" style="flex:1;margin:0;padding:0;border:none;box-shadow:none;background:none;">
+                <input type="hidden" name="accion" value="no">
+                <button type="submit" class="btn btn-sm btn-outline" style="width:100%;padding:8px;">No</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- FONDO ACUMULADO -->
+    <div class="section">
+        <div class="section-header">
+            <h2 class="gradient-text-orange">🐷 Fondo Acumulado</h2>
+            {% if fondo_info.total_acumulado > 0 %}
+            <form action="{{ url_for('reiniciar_fondo') }}" method="POST" style="display:inline;margin:0;padding:0;border:none;box-shadow:none;background:none;">
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Reiniciar fondo a $0?')">Reiniciar</button>
+            </form>
+            {% endif %}
+        </div>
+        <div class="card-item">
+            <div class="card-row">
+                <span class="card-label">Acumulado</span>
+                <span class="card-value" style="font-size:1.2em;font-weight:800;color:var(--orange);">${{ "%.2f"|format(fondo_info.total_acumulado) }}</span>
+            </div>
+            <div class="card-row">
+                <span class="card-label">Progreso</span>
+                <span class="card-value">
+                    <div class="progress-bar" style="width:100px;"><div class="progress-fill" style="width:{{ (fondo_info.total_acumulado / 500 * 100)|round if fondo_info.total_acumulado > 0 else 0 }}%;background:var(--gradient-orange);"></div></div>
+                    <small>{{ ((fondo_info.total_acumulado / 500) * 100)|round if fondo_info.total_acumulado > 0 else 0 }}%</small>
+                </span>
+            </div>
+        </div>
+        {% if fondo_info.fondos_historial %}
+        <div style="margin-top:8px;">
+            <div style="font-size:0.7em;color:var(--text-secondary);margin-bottom:4px;font-weight:600;text-transform:uppercase;">Historial</div>
+            {% for f in fondo_info.fondos_historial %}
+            {% if f.apartado == 1 %}
+            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.75em;border-bottom:1px solid var(--border-light);">
+                <span style="color:var(--text-secondary);">{{ f.semana }}</span>
+                <span style="color:var(--green);font-weight:600;">+${{ "%.2f"|format(f.sobrante) }}</span>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Calendario Hogar -->
     <div class="section">
         <div class="section-header">
