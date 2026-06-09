@@ -5,41 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agregar Gasto</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .form-checkbox {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-        .form-checkbox label { margin: 0; }
-        .form-checkbox input[type="checkbox"] { width: auto; margin: 0; }
-    </style>
 </head>
 <body>
     <div class="container">
         <div class="header-bar">
-            <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">← Volver</a>
+            <a href="{{ url_for('index', perfil=perfil) }}" class="btn btn-secondary btn-sm">← Volver</a>
             <h1 style="font-size:1em;">Nuevo Gasto</h1>
             <div></div>
         </div>
-
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <div class="messages">
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
+                <div class="messages">{% for c,m in messages %}<div class="alert alert-{{ c }}">{{ m }}</div>{% endfor %}</div>
             {% endif %}
         {% endwith %}
-
         <form method="POST" enctype="multipart/form-data">
             <label for="monto">Monto ($)</label>
             <input type="number" id="monto" name="monto" step="0.01" placeholder="0.00" required>
 
             <label for="descripcion">Descripción</label>
-            <input type="text" id="descripcion" name="descripcion" placeholder="Ej: Supermercado">
+            <input type="text" id="descripcion" name="descripcion" placeholder="Ej: Supermercado" required>
 
             <label for="categoria">Categoría</label>
             <select id="categoria" name="categoria" required>

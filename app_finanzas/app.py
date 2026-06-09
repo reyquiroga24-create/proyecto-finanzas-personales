@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 import sqlite3
 from datetime import datetime, date
 import os
-import json
 import io
 import csv
 from werkzeug.utils import secure_filename
@@ -14,26 +13,47 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 DATABASE = os.path.join(os.path.dirname(__file__), 'finanzas.db')
 
-# Colores para categorias
+# Perfiles (tabs)
+PERFILES = [
+    {'id': 'personal', 'nombre': 'Mis Gastos', 'icono': '👤'},
+    {'id': 'hogar', 'nombre': 'Hogar', 'icono': '🏠'},
+    {'id': 'resumen', 'nombre': 'Resumen', 'icono': '📊'},
+]
+
+# Categorias por perfil
 CATEGORIAS = {
-    'Alimentacion': '#e74c3c',
-    'Transporte': '#3498db',
-    'Vivienda': '#9b59b6',
-    'Entretenimiento': '#f39c12',
-    'Salud': '#27ae60',
-    'Educacion': '#1abc9c',
-    'Ropa': '#e67e22',
-    'Servicios': '#34495e',
-    'Otros': '#95a5a6'
+    'personal': {
+        'Comida': '#e74c3c',
+        'Compras': '#3498db',
+        'Transporte': '#f39c12',
+        'Entretenimiento': '#9b59b6',
+        'Salud': '#27ae60',
+        'Suscripciones': '#1abc9c',
+        'Ropa': '#e67e22',
+        'Otros': '#95a5a6',
+    },
+    'hogar': {
+        'Luz': '#f1c40f',
+        'Agua': '#3498db',
+        'Internet': '#e74c3c',
+        'Celular': '#9b59b6',
+        'Renta': '#e67e22',
+        'Despensa': '#27ae60',
+        'Mantenimiento': '#34495e',
+        'Gas': '#f39c12',
+        'Otros': '#95a5a6',
+    }
 }
+
+# Combinar todas para compatibilidad
+TODAS_CATEGORIAS = {}
+for p in CATEGORIAS:
+    TODAS_CATEGORIAS.update(CATEGORIAS[p])
 
 MESES_ES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
-DIAS_ES = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
-
 def fecha_legible(fecha_str):
-    """Convierte 2026-06-09 a '9 de Junio, 2026'"""
     try:
         f = datetime.strptime(fecha_str, '%Y-%m-%d')
         hoy = date.today()
@@ -50,88 +70,96 @@ def fecha_legible(fecha_str):
     except:
         return fecha_str
 
-def get_db_connection():
+def get_db():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS ingresos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            monto REAL NOT NULL,
-            descripcion TEXT NOT NULL,
-            fecha TEXT NOT NULL,
-            recurrencia TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS gastos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            monto REAL NOT NULL,
-            descripcion TEXT NOT NULL,
-            categoria TEXT NOT NULL,
-            fecha TEXT NOT NULL,
-            recurrencia TEXT,
-            comprobante TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS metas_ahorro (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            monto_objetivo REAL NOT NULL,
-            monto_actual REAL DEFAULT 0.0,
-            fecha_limite TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS deudas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            monto_total REAL NOT NULL,
-            monto_pagado REAL DEFAULT 0.0,
-            fecha_inicio TEXT NOT NULL,
-            fecha_fin_estimada TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""CREATE TABLE IF NOT EXISTS gastos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        perfil TEXT NOT NULL DEFAULT 'personal',
+        monto REAL NOT NULL,
+        descripcion TEXT NOT NULL,
+        categoria TEXT NOT NULL,
+        fecha TEXT NOT NULL,
+        recurrencia TEXT DEFAULT '',
+        comprobante TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS ingresos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        monto REAL NOT NULL,
+        descripcion TEXT NOT NULL,
+        fecha TEXT NOT NULL,
+        recurrencia TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS metas_ahorro (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        monto_objetivo REAL NOT NULL,
+        monto_actual REAL DEFAULT 0.0,
+        fecha_limite TEXT NOT NULL
+    )""")
+    c.execute("""CREATE TABLE IF NOT EXISTS deudas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        monto_total REAL NOT NULL,
+        monto_pagado REAL DEFAULT 0.0,
+        fecha_inicio TEXT NOT NULL,
+        fecha_fin_estimada TEXT
+    )""")
     conn.commit()
     conn.close()
 
 @app.route('/')
-def index():
-    conn = get_db_connection()
+@app.route('/<perfil>')
+def index(perfil='personal'):
+    if perfil not in [p['id'] for p in PERFILES]:
+        perfil = 'personal'
+
+    conn = get_db()
+    hoy = date.today()
+    mes_actual_str = f"{hoy.year}-{hoy.month:02d}"
+
+    # Gastos del perfil actual
+    gastos = conn.execute(
+        'SELECT * FROM gastos WHERE perfil = ? ORDER BY fecha DESC',
+        (perfil,)).fetchall()
+
+    # Dashboard del perfil
+    total_mes = conn.execute(
+        "SELECT COALESCE(SUM(monto), 0) FROM gastos WHERE perfil = ? AND strftime('%Y-%m', fecha) = ?",
+        (perfil, mes_actual_str)).fetchone()[0]
+
+    gastos_categoria = conn.execute(
+        "SELECT categoria, SUM(monto) as total FROM gastos WHERE perfil = ? AND strftime('%Y-%m', fecha) = ? GROUP BY categoria ORDER BY total DESC",
+        (perfil, mes_actual_str)).fetchall()
+
+    total_general = conn.execute(
+        "SELECT COALESCE(SUM(monto), 0) FROM gastos WHERE perfil = ?", (perfil,)).fetchone()[0]
+
+    # Totales combinados (todos los perfiles)
+    gasto_total_mes_todos = conn.execute(
+        "SELECT COALESCE(SUM(monto), 0) FROM gastos WHERE strftime('%Y-%m', fecha) = ?",
+        (mes_actual_str,)).fetchone()[0]
+
+    gastos_por_perfil = conn.execute(
+        "SELECT perfil, COALESCE(SUM(monto), 0) as total FROM gastos WHERE strftime('%Y-%m', fecha) = ? GROUP BY perfil",
+        (mes_actual_str,)).fetchall()
+
+    # Resumen general (siempre)
     ingresos = conn.execute('SELECT * FROM ingresos ORDER BY fecha DESC').fetchall()
-    gastos = conn.execute('SELECT * FROM gastos ORDER BY fecha DESC').fetchall()
     metas = conn.execute('SELECT * FROM metas_ahorro ORDER BY fecha_limite ASC').fetchall()
     deudas = conn.execute('SELECT * FROM deudas ORDER BY fecha_inicio DESC').fetchall()
 
-    # Dashboard - Resumen
-    hoy = date.today()
-    mes_actual = f"{hoy.year}-{hoy.month:02d}"
-
     total_ingresos_mes = conn.execute(
         "SELECT COALESCE(SUM(monto), 0) FROM ingresos WHERE strftime('%Y-%m', fecha) = ?",
-        (mes_actual,)).fetchone()[0]
-    total_gastos_mes = conn.execute(
-        "SELECT COALESCE(SUM(monto), 0) FROM gastos WHERE strftime('%Y-%m', fecha) = ?",
-        (mes_actual,)).fetchone()[0]
-    balance = total_ingresos_mes - total_gastos_mes
-
-    # Gastos por categoria (grafico)
-    gastos_categoria = conn.execute(
-        "SELECT categoria, SUM(monto) as total FROM gastos WHERE strftime('%Y-%m', fecha) = ? GROUP BY categoria ORDER BY total DESC",
-        (mes_actual,)).fetchall()
-
-    # Totales generales
+        (mes_actual_str,)).fetchone()[0]
     total_ingresos = conn.execute("SELECT COALESCE(SUM(monto), 0) FROM ingresos").fetchone()[0]
-    total_gastos = conn.execute("SELECT COALESCE(SUM(monto), 0) FROM gastos").fetchone()[0]
     total_metas = conn.execute("SELECT COALESCE(SUM(monto_objetivo), 0) FROM metas_ahorro").fetchone()[0]
     total_ahorrado = conn.execute("SELECT COALESCE(SUM(monto_actual), 0) FROM metas_ahorro").fetchone()[0]
     total_deudas = conn.execute("SELECT COALESCE(SUM(monto_total), 0) FROM deudas").fetchone()[0]
@@ -139,278 +167,249 @@ def index():
 
     conn.close()
 
+    cats = CATEGORIAS.get(perfil, {})
+
     return render_template('index.html',
-                         ingresos=ingresos, gastos=gastos, metas=metas, deudas=deudas,
-                         fecha_legible=fecha_legible,
-                         total_ingresos_mes=total_ingresos_mes,
-                         total_gastos_mes=total_gastos_mes,
-                         balance=balance,
-                         gastos_categoria=gastos_categoria,
-                         categorias=CATEGORIAS,
-                         total_ingresos=total_ingresos,
-                         total_gastos=total_gastos,
-                         total_metas=total_metas,
-                         total_ahorrado=total_ahorrado,
-                         total_deudas=total_deudas,
-                         total_pagado=total_pagado,
-                         mes_actual=f"{MESES_ES[hoy.month]} {hoy.year}")
+        perfiles=PERFILES, perfil_activo=perfil,
+        gastos=gastos, ingresos=ingresos, metas=metas, deudas=deudas,
+        fecha_legible=fecha_legible,
+        total_mes=total_mes,
+        total_general=total_general,
+        gastos_categoria=gastos_categoria,
+        categorias=cats,
+        total_ingresos_mes=total_ingresos_mes,
+        total_ingresos=total_ingresos,
+        total_metas=total_metas,
+        total_ahorrado=total_ahorrado,
+        total_deudas=total_deudas,
+        total_pagado=total_pagado,
+        gasto_total_mes_todos=gasto_total_mes_todos,
+        gastos_por_perfil=gastos_por_perfil,
+        mes_actual=f"{MESES_ES[hoy.month]} {hoy.year}",
+        desglose_gastos_totales=sum(r['total'] for r in gastos_por_perfil) if gastos_por_perfil else 0,
+        total_ingresos_mes_resumen=total_ingresos_mes,
+    )
 
-# ---- API para graficos ----
-@app.route('/api/gastos_categoria')
-def api_gastos_categoria():
-    conn = get_db_connection()
+# ---- API ----
+@app.route('/api/gastos_categoria/<perfil>')
+def api_gastos_categoria(perfil):
+    conn = get_db()
     hoy = date.today()
-    mes_actual = f"{hoy.year}-{hoy.month:02d}"
+    ms = f"{hoy.year}-{hoy.month:02d}"
     data = conn.execute(
-        "SELECT categoria, SUM(monto) as total FROM gastos WHERE strftime('%Y-%m', fecha) = ? GROUP BY categoria ORDER BY total DESC",
-        (mes_actual,)).fetchall()
+        "SELECT categoria, SUM(monto) as total FROM gastos WHERE perfil=? AND strftime('%Y-%m',fecha)=? GROUP BY categoria ORDER BY total DESC",
+        (perfil, ms)).fetchall()
     conn.close()
-    return jsonify([{'categoria': r['categoria'], 'total': r['total'], 'color': CATEGORIAS.get(r['categoria'], '#95a5a6')} for r in data])
+    cats = CATEGORIAS.get(perfil, TODAS_CATEGORIAS)
+    return jsonify([{'categoria': r['categoria'], 'total': r['total'], 'color': cats.get(r['categoria'], '#95a5a6')} for r in data])
 
-@app.route('/api/evolucion')
-def api_evolucion():
-    conn = get_db_connection()
-    data = conn.execute("""
-        SELECT strftime('%Y-%m', fecha) as mes,
-               SUM(CASE WHEN 'ingresos' = 'ingresos' THEN monto ELSE 0 END) as ingresos,
-               SUM(CASE WHEN 'gastos' = 'gastos' THEN monto ELSE 0 END) as gastos
-        FROM (
-            SELECT fecha, monto, 'ingresos' as tipo FROM ingresos
-            UNION ALL
-            SELECT fecha, monto, 'gastos' as tipo FROM gastos
-        ) GROUP BY mes ORDER BY mes
-    """).fetchall()
-    conn.close()
-    return jsonify([dict(r) for r in data])
-
-# ---- Exportar ----
-@app.route('/exportar/<tipo>')
-def exportar(tipo):
-    conn = get_db_connection()
-    if tipo == 'csv':
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(['Tipo', 'Monto', 'Descripcion', 'Categoria', 'Fecha', 'Recurrencia'])
-        for r in conn.execute("SELECT 'Ingreso' as tipo, monto, descripcion, '' as categoria, fecha, recurrencia FROM ingresos").fetchall():
-            writer.writerow([r['tipo'], r['monto'], r['descripcion'], r['categoria'], r['fecha'], r['recurrencia']])
-        for r in conn.execute("SELECT 'Gasto' as tipo, monto, descripcion, categoria, fecha, recurrencia FROM gastos").fetchall():
-            writer.writerow([r['tipo'], r['monto'], r['descripcion'], r['categoria'], r['fecha'], r['recurrencia']])
-        conn.close()
-        mem = io.BytesIO()
-        mem.write(output.getvalue().encode('utf-8'))
-        mem.seek(0)
-        return send_file(mem, mimetype='text/csv', as_attachment=True, download_name=f'finanzas_{date.today().isoformat()}.csv')
-    conn.close()
-    flash('Formato no soportado', 'error')
-    return redirect(url_for('index'))
-
-# ---- Rutas CRUD existentes ----
-@app.route('/agregar_ingreso', methods=('GET', 'POST'))
-def agregar_ingreso():
+# ---- CRUD Gastos con perfil ----
+@app.route('/agregar_gasto/<perfil>', methods=('GET', 'POST'))
+def agregar_gasto(perfil):
+    if perfil not in [p['id'] for p in PERFILES] or perfil == 'resumen':
+        flash('Perfil no valido', 'error')
+        return redirect(url_for('index'))
     if request.method == 'POST':
-        monto = request.form['monto']
-        descripcion = request.form['descripcion']
-        fecha = request.form['fecha']
-        recurrencia = request.form['recurrencia']
-        if not monto or not descripcion or not fecha:
-            flash('Todos los campos son obligatorios.', 'error')
-        else:
-            conn = get_db_connection()
-            conn.execute('INSERT INTO ingresos (monto, descripcion, fecha, recurrencia) VALUES (?, ?, ?, ?)',
-                         (monto, descripcion, fecha, recurrencia))
-            conn.commit()
-            conn.close()
-            flash('Ingreso agregado exitosamente!', 'success')
-            return redirect(url_for('index'))
-    return render_template('agregar_ingreso.html', hoy=date.today().isoformat())
-
-@app.route('/agregar_gasto', methods=('GET', 'POST'))
-def agregar_gasto():
-    if request.method == 'POST':
-        monto = request.form['monto']
-        descripcion = request.form['descripcion']
-        categoria = request.form['categoria']
-        fecha = request.form['fecha']
-        recurrencia = request.form['recurrencia']
+        monto = request.form.get('monto')
+        descripcion = request.form.get('descripcion')
+        categoria = request.form.get('categoria')
+        fecha = request.form.get('fecha')
+        recurrencia = request.form.get('recurrencia', '')
         comprobante = None
-
-        # Subir comprobante
         if 'comprobante' in request.files:
-            file = request.files['comprobante']
-            if file and file.filename:
-                ext = file.filename.rsplit('.', 1)[-1].lower()
+            f = request.files['comprobante']
+            if f and f.filename:
+                ext = f.filename.rsplit('.', 1)[-1].lower()
                 if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
-                    filename = f"gasto_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
-                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                    comprobante = filename
-
+                    fn = f"gasto_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
+                    f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn))
+                    comprobante = fn
         if not monto or not descripcion or not categoria or not fecha:
             flash('Todos los campos son obligatorios.', 'error')
         else:
-            conn = get_db_connection()
-            conn.execute('INSERT INTO gastos (monto, descripcion, categoria, fecha, recurrencia, comprobante) VALUES (?, ?, ?, ?, ?, ?)',
-                         (monto, descripcion, categoria, fecha, recurrencia, comprobante))
+            conn = get_db()
+            conn.execute('INSERT INTO gastos (perfil, monto, descripcion, categoria, fecha, recurrencia, comprobante) VALUES (?,?,?,?,?,?,?)',
+                         (perfil, monto, descripcion, categoria, fecha, recurrencia, comprobante))
             conn.commit()
             conn.close()
             flash('Gasto agregado exitosamente!', 'success')
-            return redirect(url_for('index'))
-    return render_template('agregar_gasto.html', categorias=CATEGORIAS, hoy=date.today().isoformat())
+            return redirect(url_for('index', perfil=perfil))
+    return render_template('agregar_gasto.html',
+        categorias=CATEGORIAS.get(perfil, {}),
+        hoy=date.today().isoformat(),
+        perfil=perfil,
+        perfiles=PERFILES,
+        perfil_activo=perfil)
 
-@app.route('/agregar_meta', methods=('GET', 'POST'))
-def agregar_meta():
+@app.route('/editar_gasto/<perfil>/<int:id>', methods=('GET', 'POST'))
+def editar_gasto(perfil, id):
+    conn = get_db()
+    gasto = conn.execute('SELECT * FROM gastos WHERE id=? AND perfil=?', (id, perfil)).fetchone()
+    if not gasto:
+        flash('Gasto no encontrado', 'error')
+        return redirect(url_for('index', perfil=perfil))
     if request.method == 'POST':
-        nombre = request.form['nombre']
-        monto_objetivo = request.form['monto_objetivo']
-        fecha_limite = request.form['fecha_limite']
-        if not nombre or not monto_objetivo or not fecha_limite:
-            flash('Todos los campos son obligatorios.', 'error')
-        else:
-            conn = get_db_connection()
-            conn.execute('INSERT INTO metas_ahorro (nombre, monto_objetivo, fecha_limite) VALUES (?, ?, ?)',
-                         (nombre, monto_objetivo, fecha_limite))
-            conn.commit()
-            conn.close()
-            flash('Meta de ahorro agregada exitosamente!', 'success')
-            return redirect(url_for('index'))
-    return render_template('agregar_meta.html', hoy=date.today().isoformat())
-
-@app.route('/agregar_deuda', methods=('GET', 'POST'))
-def agregar_deuda():
-    if request.method == 'POST':
-        nombre = request.form['nombre']
-        monto_total = request.form['monto_total']
-        fecha_inicio = request.form['fecha_inicio']
-        fecha_fin_estimada = request.form['fecha_fin_estimada']
-        if not nombre or not monto_total or not fecha_inicio:
-            flash('Todos los campos son obligatorios.', 'error')
-        else:
-            conn = get_db_connection()
-            conn.execute('INSERT INTO deudas (nombre, monto_total, fecha_inicio, fecha_fin_estimada) VALUES (?, ?, ?, ?)',
-                         (nombre, monto_total, fecha_inicio, fecha_fin_estimada))
-            conn.commit()
-            conn.close()
-            flash('Deuda agregada exitosamente!', 'success')
-            return redirect(url_for('index'))
-    return render_template('agregar_deuda.html', hoy=date.today().isoformat())
-
-# ---- Editar y eliminar ----
-@app.route('/editar_ingreso/<int:id>', methods=('GET', 'POST'))
-def editar_ingreso(id):
-    conn = get_db_connection()
-    ingreso = conn.execute('SELECT * FROM ingresos WHERE id = ?', (id,)).fetchone()
-    if request.method == 'POST':
-        monto = request.form['monto']
-        descripcion = request.form['descripcion']
-        fecha = request.form['fecha']
-        recurrencia = request.form['recurrencia']
-        if not monto or not descripcion or not fecha:
-            flash('Todos los campos son obligatorios.', 'error')
-        else:
-            conn.execute('UPDATE ingresos SET monto = ?, descripcion = ?, fecha = ?, recurrencia = ? WHERE id = ?',
-                         (monto, descripcion, fecha, recurrencia, id))
-            conn.commit()
-            flash('Ingreso actualizado exitosamente!', 'success')
-            return redirect(url_for('index'))
-    conn.close()
-    return render_template('editar_ingreso.html', ingreso=ingreso)
-
-@app.route('/eliminar_ingreso/<int:id>', methods=('POST',))
-def eliminar_ingreso(id):
-    conn = get_db_connection()
-    conn.execute('DELETE FROM ingresos WHERE id = ?', (id,))
-    conn.commit()
-    conn.close()
-    flash('Ingreso eliminado exitosamente!', 'success')
-    return redirect(url_for('index'))
-
-@app.route('/editar_gasto/<int:id>', methods=('GET', 'POST'))
-def editar_gasto(id):
-    conn = get_db_connection()
-    gasto = conn.execute('SELECT * FROM gastos WHERE id = ?', (id,)).fetchone()
-    if request.method == 'POST':
-        monto = request.form['monto']
-        descripcion = request.form['descripcion']
-        categoria = request.form['categoria']
-        fecha = request.form['fecha']
-        recurrencia = request.form['recurrencia']
+        monto = request.form.get('monto')
+        descripcion = request.form.get('descripcion')
+        categoria = request.form.get('categoria')
+        fecha = request.form.get('fecha')
+        recurrencia = request.form.get('recurrencia', '')
         if not monto or not descripcion or not categoria or not fecha:
             flash('Todos los campos son obligatorios.', 'error')
         else:
-            conn.execute('UPDATE gastos SET monto = ?, descripcion = ?, categoria = ?, fecha = ?, recurrencia = ? WHERE id = ?',
-                         (monto, descripcion, categoria, fecha, recurrencia, id))
+            conn.execute('UPDATE gastos SET monto=?, descripcion=?, categoria=?, fecha=?, recurrencia=? WHERE id=? AND perfil=?',
+                         (monto, descripcion, categoria, fecha, recurrencia, id, perfil))
             conn.commit()
             flash('Gasto actualizado exitosamente!', 'success')
-            return redirect(url_for('index'))
+            return redirect(url_for('index', perfil=perfil))
     conn.close()
-    return render_template('editar_gasto.html', gasto=gasto, categorias=CATEGORIAS)
+    return render_template('editar_gasto.html', gasto=gasto, categorias=CATEGORIAS.get(perfil, {}), perfil=perfil)
 
-@app.route('/eliminar_gasto/<int:id>', methods=('POST',))
-def eliminar_gasto(id):
-    conn = get_db_connection()
-    conn.execute('DELETE FROM gastos WHERE id = ?', (id,))
+@app.route('/eliminar_gasto/<perfil>/<int:id>', methods=('POST',))
+def eliminar_gasto(perfil, id):
+    conn = get_db()
+    conn.execute('DELETE FROM gastos WHERE id=? AND perfil=?', (id, perfil))
     conn.commit()
     conn.close()
     flash('Gasto eliminado exitosamente!', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('index', perfil=perfil))
+
+# ---- CRUD Ingresos (global) ----
+@app.route('/agregar_ingreso', methods=('GET', 'POST'))
+def agregar_ingreso():
+    if request.method == 'POST':
+        monto, descripcion, fecha, recurrencia = request.form.get('monto'), request.form.get('descripcion'), request.form.get('fecha'), request.form.get('recurrencia', '')
+        if not monto or not descripcion or not fecha:
+            flash('Todos los campos son obligatorios.', 'error')
+        else:
+            conn = get_db()
+            conn.execute('INSERT INTO ingresos (monto, descripcion, fecha, recurrencia) VALUES (?,?,?,?)', (monto, descripcion, fecha, recurrencia))
+            conn.commit(); conn.close()
+            flash('Ingreso agregado!', 'success')
+            return redirect(url_for('index', perfil='resumen'))
+    return render_template('agregar_ingreso.html', hoy=date.today().isoformat())
+
+@app.route('/editar_ingreso/<int:id>', methods=('GET', 'POST'))
+def editar_ingreso(id):
+    conn = get_db()
+    item = conn.execute('SELECT * FROM ingresos WHERE id=?', (id,)).fetchone()
+    if request.method == 'POST':
+        monto, descripcion, fecha, recurrencia = request.form.get('monto'), request.form.get('descripcion'), request.form.get('fecha'), request.form.get('recurrencia', '')
+        if not monto or not descripcion or not fecha:
+            flash('Campos obligatorios', 'error')
+        else:
+            conn.execute('UPDATE ingresos SET monto=?, descripcion=?, fecha=?, recurrencia=? WHERE id=?', (monto, descripcion, fecha, recurrencia, id))
+            conn.commit(); conn.close()
+            flash('Ingreso actualizado!', 'success')
+            return redirect(url_for('index', perfil='resumen'))
+    conn.close()
+    return render_template('editar_ingreso.html', ingreso=item)
+
+@app.route('/eliminar_ingreso/<int:id>', methods=('POST',))
+def eliminar_ingreso(id):
+    conn = get_db()
+    conn.execute('DELETE FROM ingresos WHERE id=?', (id,))
+    conn.commit(); conn.close()
+    flash('Ingreso eliminado!', 'success')
+    return redirect(url_for('index', perfil='resumen'))
+
+# ---- CRUD Metas ----
+@app.route('/agregar_meta', methods=('GET', 'POST'))
+def agregar_meta():
+    if request.method == 'POST':
+        n, mo, fl = request.form.get('nombre'), request.form.get('monto_objetivo'), request.form.get('fecha_limite')
+        if not n or not mo or not fl:
+            flash('Campos obligatorios', 'error')
+        else:
+            conn = get_db()
+            conn.execute('INSERT INTO metas_ahorro (nombre, monto_objetivo, fecha_limite) VALUES (?,?,?)', (n, mo, fl))
+            conn.commit(); conn.close()
+            flash('Meta agregada!', 'success')
+            return redirect(url_for('index', perfil='resumen'))
+    return render_template('agregar_meta.html', hoy=date.today().isoformat())
 
 @app.route('/editar_meta/<int:id>', methods=('GET', 'POST'))
 def editar_meta(id):
-    conn = get_db_connection()
-    meta = conn.execute('SELECT * FROM metas_ahorro WHERE id = ?', (id,)).fetchone()
+    conn = get_db()
+    item = conn.execute('SELECT * FROM metas_ahorro WHERE id=?', (id,)).fetchone()
     if request.method == 'POST':
-        nombre = request.form['nombre']
-        monto_objetivo = request.form['monto_objetivo']
-        monto_actual = request.form['monto_actual']
-        fecha_limite = request.form['fecha_limite']
-        if not nombre or not monto_objetivo or not fecha_limite:
-            flash('Todos los campos son obligatorios.', 'error')
+        n, mo, ma, fl = request.form.get('nombre'), request.form.get('monto_objetivo'), request.form.get('monto_actual'), request.form.get('fecha_limite')
+        if not n or not mo or not fl:
+            flash('Campos obligatorios', 'error')
         else:
-            conn.execute('UPDATE metas_ahorro SET nombre = ?, monto_objetivo = ?, monto_actual = ?, fecha_limite = ? WHERE id = ?',
-                         (nombre, monto_objetivo, monto_actual, fecha_limite, id))
-            conn.commit()
-            flash('Meta de ahorro actualizada exitosamente!', 'success')
-            return redirect(url_for('index'))
+            conn.execute('UPDATE metas_ahorro SET nombre=?, monto_objetivo=?, monto_actual=?, fecha_limite=? WHERE id=?', (n, mo, ma, fl, id))
+            conn.commit(); conn.close()
+            flash('Meta actualizada!', 'success')
+            return redirect(url_for('index', perfil='resumen'))
     conn.close()
-    return render_template('editar_meta.html', meta=meta)
+    return render_template('editar_meta.html', meta=item)
 
 @app.route('/eliminar_meta/<int:id>', methods=('POST',))
 def eliminar_meta(id):
-    conn = get_db_connection()
-    conn.execute('DELETE FROM metas_ahorro WHERE id = ?', (id,))
-    conn.commit()
-    conn.close()
-    flash('Meta de ahorro eliminada exitosamente!', 'success')
-    return redirect(url_for('index'))
+    conn = get_db()
+    conn.execute('DELETE FROM metas_ahorro WHERE id=?', (id,))
+    conn.commit(); conn.close()
+    flash('Meta eliminada!', 'success')
+    return redirect(url_for('index', perfil='resumen'))
+
+# ---- CRUD Deudas ----
+@app.route('/agregar_deuda', methods=('GET', 'POST'))
+def agregar_deuda():
+    if request.method == 'POST':
+        n, mt, fi, ffe = request.form.get('nombre'), request.form.get('monto_total'), request.form.get('fecha_inicio'), request.form.get('fecha_fin_estimada', '')
+        if not n or not mt or not fi:
+            flash('Campos obligatorios', 'error')
+        else:
+            conn = get_db()
+            conn.execute('INSERT INTO deudas (nombre, monto_total, fecha_inicio, fecha_fin_estimada) VALUES (?,?,?,?)', (n, mt, fi, ffe))
+            conn.commit(); conn.close()
+            flash('Deuda agregada!', 'success')
+            return redirect(url_for('index', perfil='resumen'))
+    return render_template('agregar_deuda.html', hoy=date.today().isoformat())
 
 @app.route('/editar_deuda/<int:id>', methods=('GET', 'POST'))
 def editar_deuda(id):
-    conn = get_db_connection()
-    deuda = conn.execute('SELECT * FROM deudas WHERE id = ?', (id,)).fetchone()
+    conn = get_db()
+    item = conn.execute('SELECT * FROM deudas WHERE id=?', (id,)).fetchone()
     if request.method == 'POST':
-        nombre = request.form['nombre']
-        monto_total = request.form['monto_total']
-        monto_pagado = request.form['monto_pagado']
-        fecha_inicio = request.form['fecha_inicio']
-        fecha_fin_estimada = request.form['fecha_fin_estimada']
-        if not nombre or not monto_total or not fecha_inicio:
-            flash('Todos los campos son obligatorios.', 'error')
+        n, mt, mp, fi, ffe = request.form.get('nombre'), request.form.get('monto_total'), request.form.get('monto_pagado'), request.form.get('fecha_inicio'), request.form.get('fecha_fin_estimada', '')
+        if not n or not mt or not fi:
+            flash('Campos obligatorios', 'error')
         else:
-            conn.execute('UPDATE deudas SET nombre = ?, monto_total = ?, monto_pagado = ?, fecha_inicio = ?, fecha_fin_estimada = ? WHERE id = ?',
-                         (nombre, monto_total, monto_pagado, fecha_inicio, fecha_fin_estimada, id))
-            conn.commit()
-            flash('Deuda actualizada exitosamente!', 'success')
-            return redirect(url_for('index'))
+            conn.execute('UPDATE deudas SET nombre=?, monto_total=?, monto_pagado=?, fecha_inicio=?, fecha_fin_estimada=? WHERE id=?', (n, mt, mp, fi, ffe, id))
+            conn.commit(); conn.close()
+            flash('Deuda actualizada!', 'success')
+            return redirect(url_for('index', perfil='resumen'))
     conn.close()
-    return render_template('editar_deuda.html', deuda=deuda)
+    return render_template('editar_deuda.html', deuda=item)
 
 @app.route('/eliminar_deuda/<int:id>', methods=('POST',))
 def eliminar_deuda(id):
-    conn = get_db_connection()
-    conn.execute('DELETE FROM deudas WHERE id = ?', (id,))
-    conn.commit()
+    conn = get_db()
+    conn.execute('DELETE FROM deudas WHERE id=?', (id,))
+    conn.commit(); conn.close()
+    flash('Deuda eliminada!', 'success')
+    return redirect(url_for('index', perfil='resumen'))
+
+# ---- Exportar ----
+@app.route('/exportar/<perfil>')
+def exportar(perfil):
+    conn = get_db()
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(['Tipo', 'Monto', 'Descripcion', 'Categoria', 'Fecha', 'Recurrencia'])
+    if perfil == 'resumen':
+        for r in conn.execute("SELECT 'Gasto' as t, monto, descripcion, categoria, fecha, recurrencia FROM gastos").fetchall():
+            w.writerow([r['t'], r['monto'], r['descripcion'], r['categoria'], r['fecha'], r['recurrencia']])
+        for r in conn.execute("SELECT 'Ingreso' as t, monto, descripcion, '', fecha, recurrencia FROM ingresos").fetchall():
+            w.writerow([r['t'], r['monto'], r['descripcion'], r['categoria'], r['fecha'], r['recurrencia']])
+    else:
+        for r in conn.execute("SELECT 'Gasto' as t, monto, descripcion, categoria, fecha, recurrencia FROM gastos WHERE perfil=?", (perfil,)).fetchall():
+            w.writerow([r['t'], r['monto'], r['descripcion'], r['categoria'], r['fecha'], r['recurrencia']])
     conn.close()
-    flash('Deuda eliminada exitosamente!', 'success')
-    return redirect(url_for('index'))
+    mem = io.BytesIO(out.getvalue().encode('utf-8'))
+    mem.seek(0)
+    return send_file(mem, mimetype='text/csv', as_attachment=True, download_name=f'finanzas_{perfil}_{date.today().isoformat()}.csv')
 
 if __name__ == '__main__':
     init_db()
