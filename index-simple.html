@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Field Report Pro</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #333;
+    }
+    .header {
+      background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 5px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .card h2 {
+      font-size: 20px;
+      margin-bottom: 15px;
+      color: #2563eb;
+      border-bottom: 2px solid #2563eb;
+      padding-bottom: 10px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 14px;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background: #1e40af;
+    }
+    button.secondary {
+      background: #64748b;
+    }
+    button.secondary:hover {
+      background: #475569;
+    }
+    button.success {
+      background: #10b981;
+    }
+    button.success:hover {
+      background: #059669;
+    }
+    .list-item {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .list-item-text {
+      flex: 1;
+    }
+    .list-item-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .list-item-subtitle {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+      width: auto;
+      margin: 0 4px 0 0;
+    }
+    .stats {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 12px;
+      margin-bottom: 15px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+      animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    .section {
+      display: none;
+    }
+    .section.active {
+      display: block;
+    }
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 10px;
+    }
+    .nav-tab {
+      background: white;
+      border: 1px solid #ddd;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 12px;
+      color: #666;
+    }
+    .nav-tab.active {
+      background: #2563eb;
+      color: white;
+      border-color: #2563eb;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- ENCABEZADO -->
+  <div class="header">
+    <h1>📋 Field Report Pro</h1>
+    <p>Reportes de Campo - Construcción</p>
+  </div>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <div class="container">
+    <!-- NAVEGACIÓN -->
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showSection('proyecto')">🏗️ Proyecto</button>
+      <button class="nav-tab" onclick="showSection('general')">📅 General</button>
+      <button class="nav-tab" onclick="showSection('crew')">👥 Personal</button>
+      <button class="nav-tab" onclick="showSection('tasks')">✅ Tareas</button>
+      <button class="nav-tab" onclick="showSection('safety')">🛡️ Seguridad</button>
+      <button class="nav-tab" onclick="showSection('fotos')">📸 Fotos</button>
+      <button class="nav-tab" onclick="showSection('resumen')">📊 Resumen</button>
+    </div>
+
+    <!-- SECCIÓN: PROYECTO -->
+    <div id="proyecto" class="section active">
+      <div class="card">
+        <h2>🏗️ Información del Proyecto</h2>
+        <form id="projectForm">
+          <div class="form-group">
+            <label>Nombre del Proyecto *</label>
+            <input type="text" id="projectName" required>
+          </div>
+          <div class="form-group">
+            <label>Ubicación</label>
+            <input type="text" id="projectLocation">
+          </div>
+          <div class="form-group">
+            <label>Dirección</label>
+            <input type="text" id="projectAddress">
+          </div>
+          <div class="form-group">
+            <label>Contratista *</label>
+            <input type="text" id="contractorName" required>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- SECCIÓN: GENERAL -->
+    <div id="general" class="section">
+      <div class="card">
+        <h2>📅 Información General</h2>
+        <form id="generalForm">
+          <div class="form-group">
+            <label>Fecha *</label>
+            <input type="date" id="reportDate" required>
+          </div>
+          <div class="form-group">
+            <label>Supervisor *</label>
+            <input type="text" id="supervisor" required>
+          </div>
+          <div class="form-group">
+            <label>Clima</label>
+            <select id="weather">
+              <option>Seleccionar...</option>
+              <option>☀️ Soleado</option>
+              <option>☁️ Nublado</option>
+              <option>🌧️ Lluvia</option>
+              <option>❄️ Nieve</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Temperatura (°C)</label>
+            <input type="number" id="temperature" min="-50" max="60" step="0.5">
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- SECCIÓN: PERSONAL -->
+    <div id="crew" class="section">
+      <div class="card">
+        <h2>👥 Personal</h2>
+        <button onclick="openWorkerModal()">+ Agregar Trabajador</button>
+        <div class="stats" id="crewStats">
+          Trabajadores: 0 | Horas: 0
+        </div>
+        <div id="crewList"></div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN: TAREAS -->
+    <div id="tasks" class="section">
+      <div class="card">
+        <h2>✅ Tareas</h2>
+        <button onclick="openTaskModal()">+ Agregar Tarea</button>
+        <div id="tasksList"></div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN: SEGURIDAD -->
+    <div id="safety" class="section">
+      <div class="card">
+        <h2>🛡️ Seguridad</h2>
+        <form id="safetyForm">
+          <div class="form-group">
+            <label>Riesgos Identificados</label>
+            <textarea id="hazards" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="jsa"> JSA Realizado</label>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="toolbox"> Toolbox Talk Realizado</label>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- SECCIÓN: FOTOS -->
+    <div id="fotos" class="section">
+      <div class="card">
+        <h2>📸 Fotos</h2>
+        <button onclick="document.getElementById('photoInput').click()">📤 Cargar Foto</button>
+        <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhotoUpload()">
+        <div id="photosList" style="margin-top: 15px;"></div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN: RESUMEN -->
+    <div id="resumen" class="section">
+      <div class="card">
+        <h2>📊 Resumen</h2>
+        <div class="stats" id="summaryStats">
+          Cargando datos...
+        </div>
+        <button class="success" onclick="submitReport()">✅ Enviar Reporte</button>
+        <button class="secondary" onclick="saveDraft()">💾 Guardar Borrador</button>
+        <button class="secondary" onclick="newReport()">📝 Nuevo Reporte</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL TRABAJADOR -->
+  <div id="workerModal" class="modal">
+    <div class="modal-content">
+      <h2>Agregar Trabajador</h2>
+      <form id="workerForm">
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input type="text" id="workerName" required>
+        </div>
+        <div class="form-group">
+          <label>Posición</label>
+          <input type="text" id="workerPosition">
+        </div>
+        <div class="form-group">
+          <label>Horas *</label>
+          <input type="number" id="workerHours" required min="0" max="24" step="0.5">
+        </div>
+        <button type="button" onclick="addWorker()">Guardar</button>
+        <button type="button" class="secondary" onclick="closeWorkerModal()">Cancelar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL TAREA -->
+  <div id="taskModal" class="modal">
+    <div class="modal-content">
+      <h2>Agregar Tarea</h2>
+      <form id="taskForm">
+        <div class="form-group">
+          <label>Descripción *</label>
+          <textarea id="taskDesc" required rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Avance (%)</label>
+          <input type="number" id="taskPercent" min="0" max="100" value="50">
+        </div>
+        <button type="button" onclick="addTask()">Guardar</button>
+        <button type="button" class="secondary" onclick="closeTaskModal()">Cancelar</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // DATOS GLOBALES
+    let report = {
+      project: {},
+      general: {},
+      crew: [],
+      tasks: [],
+      photos: [],
+      safety: {}
+    };
+
+    // FUNCIONES BÁSICAS
+    function showSection(section) {
+      document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+      document.getElementById(section).classList.add('active');
+
+      document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Actualizar resumen
+      if (section === 'resumen') updateSummary();
+    }
+
+    function showToast(msg) {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // TRABAJADORES
+    function openWorkerModal() {
+      document.getElementById('workerModal').classList.add('active');
+    }
+
+    function closeWorkerModal() {
+      document.getElementById('workerModal').classList.remove('active');
+      document.getElementById('workerForm').reset();
+    }
+
+    function addWorker() {
+      const name = document.getElementById('workerName').value;
+      const position = document.getElementById('workerPosition').value;
+      const hours = parseFloat(document.getElementById('workerHours').value);
+
+      if (!name || !hours) {
+        alert('Complete los campos requeridos');
+        return;
+      }
+
+      report.crew.push({ name, position, hours, id: Date.now() });
+      renderCrewList();
+      closeWorkerModal();
+      showToast('✓ Trabajador agregado');
+    }
+
+    function renderCrewList() {
+      const list = document.getElementById('crewList');
+      const stats = document.getElementById('crewStats');
+
+      if (report.crew.length === 0) {
+        list.innerHTML = '<p style="color:#999;text-align:center;">Sin trabajadores</p>';
+        stats.textContent = 'Trabajadores: 0 | Horas: 0';
+        return;
+      }
+
+      const totalHours = report.crew.reduce((sum, w) => sum + w.hours, 0);
+      list.innerHTML = report.crew.map(w => `
+        <div class="list-item">
+          <div class="list-item-text">
+            <div class="list-item-title">${w.name}</div>
+            <div class="list-item-subtitle">${w.position || 'Sin posición'} • ${w.hours} hrs</div>
+          </div>
+          <button class="btn-small" onclick="removeWorker(${w.id})">✕</button>
+        </div>
+      `).join('');
+
+      stats.textContent = `Trabajadores: ${report.crew.length} | Horas: ${totalHours.toFixed(1)}`;
+    }
+
+    function removeWorker(id) {
+      report.crew = report.crew.filter(w => w.id !== id);
+      renderCrewList();
+    }
+
+    // TAREAS
+    function openTaskModal() {
+      document.getElementById('taskModal').classList.add('active');
+    }
+
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.remove('active');
+      document.getElementById('taskForm').reset();
+    }
+
+    function addTask() {
+      const desc = document.getElementById('taskDesc').value;
+      const percent = parseInt(document.getElementById('taskPercent').value);
+
+      if (!desc) {
+        alert('Describe la tarea');
+        return;
+      }
+
+      report.tasks.push({ desc, percent, id: Date.now() });
+      renderTasksList();
+      closeTaskModal();
+      showToast('✓ Tarea agregada');
+    }
+
+    function renderTasksList() {
+      const list = document.getElementById('tasksList');
+      if (report.tasks.length === 0) {
+        list.innerHTML = '<p style="color:#999;text-align:center;">Sin tareas</p>';
+        return;
+      }
+
+      list.innerHTML = report.tasks.map(t => `
+        <div class="list-item">
+          <div class="list-item-text">
+            <div class="list-item-title">${t.desc}</div>
+            <div class="list-item-subtitle">Avance: ${t.percent}%</div>
+          </div>
+          <button class="btn-small" onclick="removeTask(${t.id})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    function removeTask(id) {
+      report.tasks = report.tasks.filter(t => t.id !== id);
+      renderTasksList();
+    }
+
+    // FOTOS
+    function handlePhotoUpload() {
+      const file = document.getElementById('photoInput').files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        report.photos.push({
+          src: e.target.result,
+          name: file.name,
+          id: Date.now()
+        });
+        renderPhotosList();
+        showToast('✓ Foto agregada');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function renderPhotosList() {
+      const list = document.getElementById('photosList');
+      if (report.photos.length === 0) {
+        list.innerHTML = '<p style="color:#999;text-align:center;">Sin fotos</p>';
+        return;
+      }
+
+      list.innerHTML = report.photos.map(p => `
+        <div style="margin-bottom:15px;">
+          <img src="${p.src}" style="width:100%;border-radius:4px;max-height:200px;object-fit:cover;">
+          <p style="font-size:12px;color:#666;margin-top:5px;">${p.name}</p>
+          <button class="btn-small" onclick="removePhoto(${p.id})">✕ Eliminar</button>
+        </div>
+      `).join('');
+    }
+
+    function removePhoto(id) {
+      report.photos = report.photos.filter(p => p.id !== id);
+      renderPhotosList();
+    }
+
+    // RESUMEN Y ENVÍO
+    function updateSummary() {
+      const totalHours = report.crew.reduce((sum, w) => sum + w.hours, 0);
+      const summary = `
+        <strong>Proyecto:</strong> ${document.getElementById('projectName').value || 'Sin nombre'}<br>
+        <strong>Trabajadores:</strong> ${report.crew.length}<br>
+        <strong>Horas:</strong> ${totalHours.toFixed(1)}<br>
+        <strong>Tareas:</strong> ${report.tasks.length}<br>
+        <strong>Fotos:</strong> ${report.photos.length}
+      `;
+      document.getElementById('summaryStats').innerHTML = summary;
+    }
+
+    function saveDraft() {
+      report.project = {
+        name: document.getElementById('projectName').value,
+        location: document.getElementById('projectLocation').value,
+        address: document.getElementById('projectAddress').value,
+        contractor: document.getElementById('contractorName').value
+      };
+      report.general = {
+        date: document.getElementById('reportDate').value,
+        supervisor: document.getElementById('supervisor').value,
+        weather: document.getElementById('weather').value,
+        temp: document.getElementById('temperature').value
+      };
+      report.safety = {
+        hazards: document.getElementById('hazards').value,
+        jsa: document.getElementById('jsa').checked,
+        toolbox: document.getElementById('toolbox').checked
+      };
+
+      localStorage.setItem('reportDraft', JSON.stringify(report));
+      showToast('✓ Borrador guardado');
+    }
+
+    function submitReport() {
+      saveDraft();
+      const json = JSON.stringify(report, null, 2);
+      alert('✅ Reporte completado!\n\n' + json.substring(0, 200) + '...');
+      showToast('✓ Reporte enviado');
+    }
+
+    function newReport() {
+      if (confirm('¿Crear nuevo reporte?')) {
+        report = { project: {}, general: {}, crew: [], tasks: [], photos: [], safety: {} };
+        document.querySelectorAll('input, textarea, select').forEach(el => el.value = '');
+        document.getElementById('reportDate').valueAsDate = new Date();
+        renderCrewList();
+        renderTasksList();
+        renderPhotosList();
+        showToast('✓ Nuevo reporte creado');
+      }
+    }
+
+    // INICIALIZAR
+    window.addEventListener('load', () => {
+      document.getElementById('reportDate').valueAsDate = new Date();
+
+      const draft = localStorage.getItem('reportDraft');
+      if (draft) {
+        report = JSON.parse(draft);
+        document.getElementById('projectName').value = report.project.name || '';
+        document.getElementById('projectLocation').value = report.project.location || '';
+        document.getElementById('projectAddress').value = report.project.address || '';
+        document.getElementById('contractorName').value = report.project.contractor || '';
+        document.getElementById('reportDate').value = report.general.date || new Date().toISOString().split('T')[0];
+        document.getElementById('supervisor').value = report.general.supervisor || '';
+        document.getElementById('weather').value = report.general.weather || '';
+        document.getElementById('temperature').value = report.general.temp || '';
+        document.getElementById('hazards').value = report.safety.hazards || '';
+        document.getElementById('jsa').checked = report.safety.jsa || false;
+        document.getElementById('toolbox').checked = report.safety.toolbox || false;
+        renderCrewList();
+        renderTasksList();
+        renderPhotosList();
+        showToast('✓ Borrador cargado');
+      }
+    });
+  </script>
+</body>
+</html>
