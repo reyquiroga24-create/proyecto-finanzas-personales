@@ -98,9 +98,9 @@ app.get('/api/reports', (req, res) => {
   });
 });
 
-// SPA fallback - Servir index.html para rutas desconocidas
+// SPA fallback - Servir index-simple.html para rutas desconocidas
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index-simple.html'));
 });
 
 // ==================== ERROR HANDLING ====================
