@@ -218,13 +218,13 @@
   <div class="container">
     <!-- NAVEGACIÓN -->
     <div class="nav-tabs">
-      <button class="nav-tab active" onclick="showSection('proyecto', this)">🏗️ Proyecto</button>
-      <button class="nav-tab" onclick="showSection('general', this)">📅 General</button>
-      <button class="nav-tab" onclick="showSection('crew', this)">👥 Personal</button>
-      <button class="nav-tab" onclick="showSection('tasks', this)">✅ Tareas</button>
-      <button class="nav-tab" onclick="showSection('safety', this)">🛡️ Seguridad</button>
-      <button class="nav-tab" onclick="showSection('fotos', this)">📸 Fotos</button>
-      <button class="nav-tab" onclick="showSection('resumen', this)">📊 Resumen</button>
+      <button class="nav-tab active" data-section="proyecto">🏗️ Proyecto</button>
+      <button class="nav-tab" data-section="general">📅 General</button>
+      <button class="nav-tab" data-section="crew">👥 Personal</button>
+      <button class="nav-tab" data-section="tasks">✅ Tareas</button>
+      <button class="nav-tab" data-section="safety">🛡️ Seguridad</button>
+      <button class="nav-tab" data-section="fotos">📸 Fotos</button>
+      <button class="nav-tab" data-section="resumen">📊 Resumen</button>
     </div>
 
     <!-- SECCIÓN: PROYECTO -->
@@ -620,6 +620,20 @@
     // INICIALIZAR
     window.addEventListener('load', () => {
       document.getElementById('reportDate').valueAsDate = new Date();
+
+      // Agregar event listeners a los tabs
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const section = btn.getAttribute('data-section');
+          document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+          document.getElementById(section).classList.add('active');
+
+          document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+          btn.classList.add('active');
+
+          if (section === 'resumen') updateSummary();
+        });
+      });
 
       const draft = localStorage.getItem('reportDraft');
       if (draft) {
