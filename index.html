@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Field Report Pro - Sistema completo de reportes de campo para construcción">
+  <meta name="theme-color" content="#2563eb">
+  <title>Field Report Pro - Reportes de Campo</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%232563eb'>📋</text></svg>">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Tailwind CSS (respaldo) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- html2pdf para generar PDFs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    /* Variables CSS locales */
+    :root {
+      --primary-color: #2563eb;
+      --success-color: #10b981;
+      --danger-color: #ef4444;
+      --warning-color: #f59e0b;
+    }
+
+    /* Animaciones personalizadas */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in-up {
+      animation: fadeInUp 0.5s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <!-- CONTENEDOR PRINCIPAL -->
+  <div class="app-container">
+    <!-- ==================== ENCABEZADO ==================== -->
+    <header class="app-header">
+      <div class="app-header-content">
+        <div class="app-logo">
+          <span class="app-logo-icon">📋</span>
+          <span>Field Report Pro</span>
+        </div>
+        <div class="app-header-actions">
+          <button id="stats-btn" class="btn-secondary btn-small" title="Ver estadísticas">
+            <span>📊</span>
+            <span class="hidden sm:inline">Estadísticas</span>
+          </button>
+          <button id="sync-btn" class="btn-secondary btn-small" title="Sincronizar reportes">
+            <span>🔄</span>
+            <span class="hidden sm:inline">Sincronizar</span>
+          </button>
+          <button id="clean-storage-btn" class="btn-secondary btn-small" title="Limpiar almacenamiento">
+            <span>🗑️</span>
+            <span class="hidden sm:inline">Limpiar</span>
+          </button>
+          <button id="info-btn" class="btn-secondary btn-small" title="Acerca de">
+            <span>ℹ️</span>
+            <span class="hidden sm:inline">Info</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ==================== CONTENIDO PRINCIPAL ==================== -->
+    <div class="app-main">
+      <!-- NAVEGACIÓN LATERAL -->
+      <aside class="app-sidebar">
+        <div class="nav-group">
+          <div class="nav-group-title">Navegación</div>
+          <a href="#" data-section="project" class="nav-item active">🏗️ Proyecto</a>
+          <a href="#" data-section="general" class="nav-item">📅 General</a>
+          <a href="#" data-section="crew" class="nav-item">👥 Personal</a>
+          <a href="#" data-section="tasks" class="nav-item">✅ Tareas</a>
+          <a href="#" data-section="safety" class="nav-item">🛡️ Seguridad</a>
+          <a href="#" data-section="photos" class="nav-item">📸 Fotos</a>
+          <a href="#" data-section="summary" class="nav-item">📊 Resumen</a>
+        </div>
+      </aside>
+
+      <!-- CONTENIDO -->
+      <main class="app-content">
+        <!-- ==================== SECCIÓN: PROYECTO ==================== -->
+        <section data-section-content="project" class="card fade-in-up">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">
+                <span class="section-title-icon">🏗️</span>
+                Información del Proyecto
+              </h2>
+              <p class="section-subtitle">Datos básicos del proyecto de construcción</p>
+            </div>
+          </div>
+
+          <form id="project-form" class="form-group">
+            <div class="form-row two-cols">
+              <div>
+                <label for="projectName">Nombre del Proyecto <span class="required">*</span></label>
+                <input type="text" id="projectName" name="projectName" required placeholder="Ej: Edificio Centro Comercial">
+              </div>
+              <div>
+                <label for="projectNumber">Número de Proyecto</label>
+                <input type="text" id="projectNumber" name="projectNumber" placeholder="Ej: PROJ-2024-001">
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div>
+                <label for="projectLocation">Ubicación</label>
+                <input type="text" id="projectLocation" name="projectLocation" placeholder="Ej: Calle Principal, Zona Centro">
+              </div>
+              <div>
+                <label for="projectAddress">Dirección Completa</label>
+                <input type="text" id="projectAddress" name="projectAddress" placeholder="Ej: Calle Principal 123, Apt 4B">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label for="contractorName">Nombre del Contratista <span class="required">*</span></label>
+                <input type="text" id="contractorName" name="contractorName" required placeholder="Nombre de la empresa o persona">
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <!-- ==================== SECCIÓN: GENERAL ==================== -->
+        <section data-section-content="general" class="card fade-in-up hidden">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">
+                <span class="section-title-icon">📅</span>
+                Información General
+              </h2>
+              <p class="section-subtitle">Datos generales del reporte</p>
+            </div>
+          </div>
+
+          <form id="general-form" class="form-group">
+            <div class="form-row two-cols">
+              <div>
+                <label for="reportDate">Fecha del Reporte <span class="required">*</span></label>
+                <input type="date" id="reportDate" name="reportDate" required>
+              </div>
+              <div>
+                <label for="supervisor">Supervisor <span class="required">*</span></label>
+                <input type="text" id="supervisor" name="supervisor" required placeholder="Nombre del supervisor">
+              </div>
+            </div>
+
+            <div class="form-row two-cols">
+              <div>
+                <label for="weather">Clima</label>
+                <select id="weather" name="weather">
+                  <option value="">Seleccionar...</option>
+                  <option value="Soleado">☀️ Soleado</option>
+                  <option value="Nublado">☁️ Nublado</option>
+                  <option value="Lluvia">🌧️ Lluvia</option>
+                  <option value="Nieve">❄️ Nieve</option>
+                  <option value="Viento">💨 Viento</option>
+                </select>
+              </div>
+              <div>
+                <label for="temperature">Temperatura (°C)</label>
+                <input type="number" id="temperature" name="temperature" placeholder="Ej: 25" min="-50" max="60" step="0.5">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label for="notes">Notas Generales</label>
+                <textarea id="notes" name="notes" placeholder="Observaciones generales del día..."></textarea>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <!-- ==================== SECCIÓN: PERSONAL ==================== -->
+        <section data-section-content="crew" class="card fade-in-up hidden">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">
+                <span class="section-title-icon">👥</span>
+                Personal Presente
+              </h2>
+              <p class="section-subtitle">Registro de horas del personal</p>
+            </div>
+            <button id="add-worker-btn" class="btn-primary" type="button">+ Agregar Trabajador</button>
+          </div>
+
+          <div id="crew-stats" class="mb-20 p-4 bg-blue-50 rounded border border-blue-200">
+            <p class="text-sm text-gray-700"><strong>Personal:</strong> 0 trabajadores</p>
+            <p class="text-sm text-gray-700"><strong>Total Horas:</strong> 0 hrs</p>
+            <p class="text-sm text-gray-700"><strong>Promedio:</strong> 0 hrs/persona</p>
+          </div>
+
+          <div id="crew-list" class="item-list">
+            <p class="text-gray-500 text-center py-8">No hay trabajadores agregados</p>
+          </div>
+        </section>
+
+        <!-- ==================== SECCIÓN: TAREAS ==================== -->
+        <section data-section-content="tasks" class="card fade-in-up hidden">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">
+                <span class="section-title-icon">✅</span>
+                Tareas Realizadas
+              </h2>
+              <p class="section-subtitle">Registro de actividades completadas</p>
+            </div>
+            <button id="add-task-btn" class="btn-primary" type="button">+ Agregar Tarea</button>
+          </div>
+
+          <div id="tasks-list" class="item-list">
+            <p class="text-gray-500 text-center py-8">No hay tareas agregadas</p>
+          </div>
+        </section>
+
+        <!-- ==================== SECCIÓN: SEGURIDAD ==================== -->
+        <section data-section-content="safety" class="card fade-in-up hidden">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">
+                <span class="section-title-icon">🛡️</span>
+                Información de Seguridad
+              </h2>
+              <p class="section-subtitle">Riesgos, medidas preventivas y capacitaciones</p>
+            </div>
+          </div>
+
+          <form id="safety-form" class="form-group">
+            <div class="form-row">
+              <div>
+                <label for="hazardsIdentified">Riesgos Identificados</label>
+                <textarea id="hazardsIdentified" name="hazardsIdentified" placeholder="Describe los riesgos encontrados durante el día..."></textarea>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="flex items-center gap-2 mb-3">
+                  <input type="checkbox" id="jsa" name="jsa">
+                  <span>✓ JSA (Job Safety Analysis) Realizado</span>
+                </label>
+              </div>
+              <div>
+                <label class="flex items-center gap-2 mb-3">
+                  <input type="checkbox" id="toolboxTalk" name="toolboxTalk">
+                  <span>✓ Toolbox Talk Realizado</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label for="preventiveMeasures">Medidas Preventivas Implementadas</label>
+                <textarea id="preventiveMeasures" name="preventiveMeasures" placeholder="Describe las medidas tomadas para mitigar riesgos..."></textarea>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <!-- ==================== SECCIÓN: FOTOS ==================== -->
+        <section data-section-content="photos" class="card fade-in-up hidden">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">
+                <span class="section-title-icon">📸</span>
+                Evidencia Fotográfica
+              </h2>
+              <p class="section-subtitle" id="photo-count">0/20 fotos</p>
+            </div>
+            <div class="flex gap-3">
+              <button id="upload-photo-btn" class="btn-primary" type="button">📤 Cargar Foto</button>
+              <button id="camera-btn" class="btn-secondary" type="button" title="Capturar con cámara">📷 Capturar</button>
+            </div>
+          </div>
+
+          <div id="photos-list" class="grid-2">
+            <p class="text-gray-500 text-center py-8 col-span-2">No hay fotos agregadas</p>
+          </div>
+        </section>
+
+        <!-- ==================== SECCIÓN: RESUMEN ==================== -->
+        <section data-section-content="summary" class="card fade-in-up hidden">
+          <div class="section-header">
+            <h2 class="section-title">
+              <span class="section-title-icon">📊</span>
+              Resumen del Reporte
+            </h2>
+          </div>
+
+          <div id="summary-content" class="space-y-6">
+            <!-- Proyecto -->
+            <div class="border-l-4 border-blue-500 pl-4">
+              <h3 class="font-bold text-gray-800 mb-2">Proyecto</h3>
+              <p class="text-sm text-gray-600" id="summary-project">-</p>
+            </div>
+
+            <!-- Estadísticas -->
+            <div class="border-l-4 border-green-500 pl-4">
+              <h3 class="font-bold text-gray-800 mb-2">Estadísticas</h3>
+              <p class="text-sm text-gray-600" id="summary-stats">-</p>
+            </div>
+
+            <!-- Acciones -->
+            <div class="flex flex-col gap-3">
+              <button id="save-report-btn" class="btn-secondary" type="button">💾 Guardar Borrador</button>
+              <button id="submit-report-btn" class="btn-success" type="button">✅ Enviar Reporte</button>
+              <button id="export-report-btn" class="btn-outline" type="button">📥 Exportar</button>
+              <button id="new-report-btn" class="btn-outline" type="button">📝 Nuevo Reporte</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- ==================== PIE DE PÁGINA ==================== -->
+    <footer class="app-footer">
+      <p>Field Report Pro v1.0.0 | Sistema de Reportes de Campo para Construcción</p>
+      <p style="margin-top: 10px; font-size: 11px; color: #999;">
+        © 2024. Todos los derechos reservados. |
+        <span id="sync-status">Estado: Listo</span> |
+        <span id="storage-status">Almacenamiento: Bien</span>
+      </p>
+    </footer>
+  </div>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  <!-- Configuración -->
+  <script src="config/config.js"></script>
+
+  <!-- Utilidades -->
+  <script src="js/utils/StorageUtils.js"></script>
+  <script src="js/utils/DateUtils.js"></script>
+  <script src="js/utils/NotificationSystem.js"></script>
+
+  <!-- Módulos -->
+  <script src="js/modules/Validator.js"></script>
+  <script src="js/modules/PhotoManager.js"></script>
+  <script src="js/modules/WebhookSender.js"></script>
+  <script src="js/modules/DataManager.js"></script>
+  <script src="js/modules/FormHandler.js"></script>
+  <script src="js/modules/ReportGenerator.js"></script>
+
+  <!-- Aplicación Principal -->
+  <script src="js/app.js"></script>
+
+  <!-- Script de actualización de resumen y estado -->
+  <script>
+    // Actualizar estado de sincronización cada segundo
+    setInterval(() => {
+      const syncStatus = WebhookSender.getSyncStatus();
+      const statusEl = document.getElementById('sync-status');
+      if (statusEl) {
+        if (syncStatus.pendingReports > 0) {
+          statusEl.textContent = `Estado: ${syncStatus.pendingReports} pendiente(s) de enviar`;
+          statusEl.style.color = '#f59e0b';
+        } else if (syncStatus.isOnline) {
+          statusEl.textContent = 'Estado: Sincronizado ✓';
+          statusEl.style.color = '#10b981';
+        } else {
+          statusEl.textContent = 'Estado: Sin conexión ⚠️';
+          statusEl.style.color = '#ef4444';
+        }
+      }
+
+      const storageInfo = DataManager.getStorageInfo();
+      const storageEl = document.getElementById('storage-status');
+      if (storageEl) {
+        const usage = storageInfo.usagePercentage;
+        if (usage > 80) {
+          storageEl.textContent = `Almacenamiento: ${usage}% (¡Casi lleno!)`;
+          storageEl.style.color = '#ef4444';
+        } else if (usage > 50) {
+          storageEl.textContent = `Almacenamiento: ${usage}%`;
+          storageEl.style.color = '#f59e0b';
+        } else {
+          storageEl.textContent = `Almacenamiento: ${usage}% Disponible`;
+          storageEl.style.color = '#10b981';
+        }
+      }
+    }, 2000);
+
+    // Actualizar sección de resumen
+    setInterval(() => {
+      if (DataManager.currentReport) {
+        const project = DataManager.currentReport.projectData;
+        const projectEl = document.getElementById('summary-project');
+        if (projectEl) {
+          projectEl.textContent = project.name || '(Sin nombre)' + (project.location ? ` - ${project.location}` : '');
+        }
+
+        const stats = DataManager.getReportStats();
+        const statsEl = document.getElementById('summary-stats');
+        if (statsEl) {
+          statsEl.innerHTML = `
+            <p>👥 Trabajadores: <strong>${stats.workerCount}</strong></p>
+            <p>⏱️ Total Horas: <strong>${stats.totalHours}</strong></p>
+            <p>✅ Tareas: <strong>${stats.taskCount}</strong></p>
+            <p>📸 Fotos: <strong>${stats.photoCount}</strong></p>
+          `;
+        }
+      }
+    }, 1000);
+
+    // Vincular navegación después de que todo esté cargado
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-section]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const section = btn.dataset.section;
+
+          // Actualizar clase activa
+          document.querySelectorAll('[data-section]').forEach((b) => {
+            b.classList.remove('active');
+          });
+          btn.classList.add('active');
+
+          // Mostrar sección
+          document.querySelectorAll('[data-section-content]').forEach((sec) => {
+            sec.classList.add('hidden');
+          });
+          const target = document.querySelector(`[data-section-content="${section}"]`);
+          if (target) {
+            target.classList.remove('hidden');
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

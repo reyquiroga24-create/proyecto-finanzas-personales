@@ -1,0 +1,164 @@
+# ==========================================
+# FIELD REPORT PRO - GITIGNORE
+# ==========================================
+
+# Node.js
+node_modules/
+npm-debug.log
+package-lock.json
+yarn.lock
+.npm
+.eslintcache
+
+# Dependencias
+/vendor
+composer.lock
+
+# IDE y editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+
+# Configuración local
+.env
+.env.local
+.env.*.local
+settings.local.json
+
+# Archivos de sistema
+.cache/
+dist/
+build/
+.tmp/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Directorio de dependencias
+dependency-lock.json
+
+# Archivos temporales de desarrollo
+temp/
+tmp/
+.parcel-cache
+
+# Salida de construcción
+.out/
+
+# Variables de entorno
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Archivos locales que no deben ser versionados
+*.pem
+*.key
+.credentials
+secrets.json
+
+# Caché de navegador
+.parcel-cache
+dist/
+
+# Electron
+main.js
+preload.js
+
+# Archivos de bloqueo de sistema
+.lock
+
+# VS Code settings
+settings.json
+launch.json
+extensions.json
+
+# Archivos compilados
+*.o
+*.so
+*.a
+*.dll
+*.exe
+*.out
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# Ruby
+.ruby-version
+.ruby-gemset
+Gemfile.lock
+
+# Java
+*.class
+*.jar
+*.war
+
+# Archivos de backup
+*.bak
+*.backup
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Archivos sensibles
+.github/workflows/secrets.yml
+.github/workflows/*.key
+.firebase/
+
+# Reportes de cobertura
+coverage/
+.nyc_output/
+
+# Tests
+test-results/
+reports/
+
+# Documentación generada
+docs/_build/
+
+# Archivos de datos generados
+data/
+*.sqlite
+*.db
+
+# Otros
+.vuepress/dist
+.cache
+.nuxt
+dist
+.cache/
+.output/
+
+# Webpack
+webpack-assets.json
+
+# Storybook
+storybook-static/
+
+# Playwright
+.test-results/
