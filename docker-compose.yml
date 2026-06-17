@@ -21,21 +21,21 @@ services:
       - "com.example.description=Field Report Pro Application"
       - "com.example.version=1.0.0"
 
-  # Nginx reverse proxy (opcional)
-  nginx:
-    image: nginx:alpine
-    container_name: field-report-nginx
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certs:/etc/nginx/certs:ro
-    depends_on:
-      - app
-    networks:
-      - field-report-network
+  # Nginx reverse proxy (comentado - usar sistema nginx si es necesario)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: field-report-nginx
+  #   restart: always
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./certs:/etc/nginx/certs:ro
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - field-report-network
 
 networks:
   field-report-network:
