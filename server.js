@@ -21,7 +21,18 @@ const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'production';
 
 // ==================== MIDDLEWARE ====================
-app.use(helmet()); // Seguridad HTTP headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      scriptSrcAttr: ["'unsafe-inline'"], // Allow inline event handlers
+      styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+      imgSrc: ["'self'", 'data:'],
+      fontSrc: ["'self'", 'https:', 'data:'],
+    }
+  }
+})); // Seguridad HTTP headers
 app.use(compression()); // Compresión gzip
 app.use(cors()); // CORS
 app.use(express.json({ limit: '50mb' }));
