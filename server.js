@@ -27,9 +27,9 @@ app.use(cors()); // CORS
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Servir archivos estáticos
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(path.join(__dirname, '.')));
+// Servir archivos estáticos (sin servir index.html automáticamente)
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use(express.static(path.join(__dirname, '.'), { index: false }));
 
 // ==================== RUTAS ====================
 
