@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: field-report-pro
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      WEBHOOK_URL: ${WEBHOOK_URL}
+    volumes:
+      - ./data:/app/data
+    networks:
+      - field-report-network
+    labels:
+      - "com.example.description=Field Report Pro Application"
+      - "com.example.version=1.0.0"
+
+  # Nginx reverse proxy (opcional)
+  nginx:
+    image: nginx:alpine
+    container_name: field-report-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - app
+    networks:
+      - field-report-network
+
+networks:
+  field-report-network:
+    driver: bridge
+
+volumes:
+  data:
+    driver: local
